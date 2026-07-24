@@ -261,11 +261,11 @@ export default function App() {
         contents.push(await fileToGenerativePart(file));
       }
       if (syllabusFiles.length > 0) {
-         contents.push("以上是課綱參考資料，請根據裡面的學習表現、學習內容編碼與內容來分析後續的考卷。");
+         contents.push("以上是課本或相關參考資料，請根據課本內容自動判斷各單元名稱，並為每個單元推導出符合 108 課綱的「學習表現」與「學習內容」對應編碼。");
       }
 
       contents.push(await fileToGenerativePart(testPaperFile));
-      contents.push(`這是一份測驗卷。請幫我分析這份試卷的每一題，並總結歸納出一個雙向細目表，同時從標題提取基本資訊。
+      contents.push(`這是一份測驗卷。請幫我分析這份試卷的每一題，並根據上方的課本內容（若有）將試題分類到對應的單元中，最後總結歸納出一個雙向細目表，同時從試卷標題提取基本資訊。
       請將分析結果以嚴格的 JSON 格式回傳，包含以下屬性：
       {
         "academicYear": "112",
@@ -410,8 +410,8 @@ export default function App() {
                         <FileUp size={18} className="text-indigo-600" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-slate-700 truncate">上傳課綱參考資料 (可複選)</p>
-                        <p className="text-xs text-slate-400 truncate">{syllabusFiles.length > 0 ? `已選取 ${syllabusFiles.length} 個檔案` : '支援 PDF/Word/圖片多檔上傳'}</p>
+                        <p className="text-sm font-semibold text-slate-700 truncate">上傳課本內容 (可複選)</p>
+                        <p className="text-xs text-slate-400 truncate">{syllabusFiles.length > 0 ? `已選取 ${syllabusFiles.length} 個檔案` : '選填：供 AI 分類單元與課綱'}</p>
                       </div>
                       <input type="file" className="hidden" multiple accept=".pdf,.docx,.jpg,.png" onChange={e => setSyllabusFiles(Array.from(e.target.files))} />
                     </label>
