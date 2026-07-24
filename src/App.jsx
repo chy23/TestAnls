@@ -3,6 +3,7 @@ import { Upload, FileText, Download, Plus, Trash2, Settings, Table as TableIcon,
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, VerticalAlign } from 'docx';
 import { saveAs } from 'file-saver';
 import { GoogleGenAI } from '@google/genai';
+import syllabusData from './data/syllabus.json';
 
 export default function App() {
   const [apiKey, setApiKey] = useState('');
@@ -266,6 +267,9 @@ export default function App() {
 
       contents.push(await fileToGenerativePart(testPaperFile));
       contents.push(`這是一份測驗卷。請幫我分析這份試卷的每一題，並根據上方的課本內容（若有）將試題分類到對應的單元中，最後總結歸納出一個雙向細目表，同時從試卷標題提取基本資訊。
+      我們內建了 108 課綱資料庫（包含國語、數學、社會、自然四個領域）：
+      ${JSON.stringify(syllabusData)}
+      請判斷這份試卷的科目，並自動從上述課綱資料中找出最適合的「學習表現」與「學習內容」編碼。
       請將分析結果以嚴格的 JSON 格式回傳，包含以下屬性：
       {
         "academicYear": "112",
