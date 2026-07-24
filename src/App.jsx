@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Upload, FileText, Download, Plus, Trash2, Settings, Table as TableIcon, Sparkles, Key, AlertCircle, Loader2, LayoutGrid, CheckCircle2 } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import React, { useState } from 'react';
+import { Upload, FileText, Download, Plus, Trash2, Settings, Table as TableIcon, Sparkles, Key, AlertCircle, Loader2, LayoutGrid, CheckCircle2, FileUp } from 'lucide-react';
+import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, VerticalAlign } from 'docx';
+import { saveAs } from 'file-saver';
 import { GoogleGenAI } from '@google/genai';
 
 export default function App() {
@@ -32,19 +33,13 @@ export default function App() {
   ]);
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [syllabusFile, setSyllabusFile] = useState(null);
+  const [syllabusFiles, setSyllabusFiles] = useState([]);
   const [testPaperFile, setTestPaperFile] = useState(null);
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
 
-  useEffect(() => {
-    const savedKey = localStorage.getItem('gemini_api_key');
-    if (savedKey) setApiKey(savedKey);
-  }, []);
-
   const handleApiKeyChange = (e) => {
     setApiKey(e.target.value);
-    localStorage.setItem('gemini_api_key', e.target.value);
   };
 
   const handleBasicInfoChange = (e) => {
@@ -127,70 +122,120 @@ export default function App() {
 
   const totals = calculateTotals();
 
-  const exportToExcel = () => {
-    const wb = XLSX.utils.book_new();
-    const wsData = [];
-    
-    wsData.push([`新北市林口區麗園國小 ( ${basicInfo.academicYear} ) 學年度第 ( ${basicInfo.semester} ) 學期定期評量`]);
-    wsData.push([`____${basicInfo.grade}____年級____${basicInfo.subject}____科試題雙向細目表`]);
-    wsData.push([]);
-    
-    wsData.push(['一、 試卷基本資料']);
-    wsData.push([`(一) 評量範圍： ${basicInfo.scope}`]);
-    wsData.push([`(二) 評量時間： ${basicInfo.time}`]);
-    wsData.push([`(三) 命題教師： ${basicInfo.setter}`]);
-    wsData.push([`(四) 審題教師： ${basicInfo.reviewer}`]);
-    wsData.push([]);
-    wsData.push(['二、 試卷雙向細目表']);
+  // Word Export matching PDF perfectly
+  const exportToWord = async () => {
+    const cellMargin = { top: 100, bottom: 100, left: 100, right: 100 };
+    const createCell = (text, options = {}) => {
+      return new TableCell({
+        children: [new Paragraph({ children: [new TextRun({ text: text || '', font: 'DFKai-SB', size: 24 })], alignment: AlignmentType.CENTER })],
+        verticalAlign: VerticalAlign.CENTER,
+        margins: cellMargin,
+        ...options
+      });
+    };
 
-    wsData.push(['單元名稱', '學習重點', null, '題型', '認知領域的目標層次', null, null, null, null, null, '題數分配', '分數分配']);
-    wsData.push([null, '(以編碼呈現)', null, null, '知識、理解', null, '應用、分析', null, '評鑑、創造', null, null, null]);
-    wsData.push([null, '學習表現', '學習內容', null, '題數', '佔分', '題數', '佔分', '題數', '佔分', null, null]);
+    const title1 = new Paragraph({
+      children: [new TextRun({ text: `新北市林口區麗園國小 ( ${basicInfo.academicYear} ) 學年度第 ( ${basicInfo.semester} ) 學期定期評量`, size: 32, font: 'DFKai-SB' })],
+      alignment: AlignmentType.CENTER
+    });
+    const title2 = new Paragraph({
+      children: [new TextRun({ text: `____${basicInfo.grade}____年級____${basicInfo.subject}____科試題雙向細目表`, size: 32, font: 'DFKai-SB' })],
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 300 }
+    });
+
+    const info1 = new Paragraph({ children: [new TextRun({ text: '一、 試卷基本資料', size: 24, font: 'DFKai-SB' })] });
+    const info2 = new Paragraph({ children: [new TextRun({ text: `(一) 評量範圍： ${basicInfo.scope}`, size: 24, font: 'DFKai-SB' })] });
+    const info3 = new Paragraph({ children: [new TextRun({ text: `(二) 評量時間： ${basicInfo.time}`, size: 24, font: 'DFKai-SB' })] });
+    const info4 = new Paragraph({ children: [new TextRun({ text: `(三) 命題教師： ${basicInfo.setter}`, size: 24, font: 'DFKai-SB' })] });
+    const info5 = new Paragraph({ children: [new TextRun({ text: `(四) 審題教師： ${basicInfo.reviewer}`, size: 24, font: 'DFKai-SB' })], spacing: { after: 200 } });
+    const info6 = new Paragraph({ children: [new TextRun({ text: '二、 試卷雙向細目表', size: 24, font: 'DFKai-SB' })] });
+
+    const headerRow1 = new TableRow({
+      children: [
+        createCell('單元名稱', { rowSpan: 3 }),
+        createCell('學習重點\n(以編碼呈現)', { columnSpan: 2 }),
+        createCell('題型', { rowSpan: 3 }),
+        createCell('認知領域的目標層次', { columnSpan: 6 }),
+        createCell('題數\n分配', { rowSpan: 2 }),
+        createCell('分數\n分配', { rowSpan: 2 }),
+      ]
+    });
+
+    const headerRow2 = new TableRow({
+      children: [
+        createCell('學習表現', { rowSpan: 2 }),
+        createCell('學習內容', { rowSpan: 2 }),
+        createCell('知識、理解', { columnSpan: 2 }),
+        createCell('應用、分析', { columnSpan: 2 }),
+        createCell('評鑑、創造', { columnSpan: 2 }),
+      ]
+    });
+
+    const headerRow3 = new TableRow({
+      children: [
+        createCell('題數'), createCell('佔分'),
+        createCell('題數'), createCell('佔分'),
+        createCell('題數'), createCell('佔分'),
+        createCell('題數'), createCell('佔分'),
+      ]
+    });
+
+    const tableRows = [headerRow1, headerRow2, headerRow3];
 
     tableData.forEach(row => {
       const rowCount = row.cognitiveScores.knowledge.count + row.cognitiveScores.application.count + row.cognitiveScores.evaluation.count;
       const rowScore = row.cognitiveScores.knowledge.score + row.cognitiveScores.application.score + row.cognitiveScores.evaluation.score;
-      wsData.push([
-        row.unitName, row.learningPerformance, row.learningContent, row.questionType,
-        row.cognitiveScores.knowledge.count, row.cognitiveScores.knowledge.score,
-        row.cognitiveScores.application.count, row.cognitiveScores.application.score,
-        row.cognitiveScores.evaluation.count, row.cognitiveScores.evaluation.score,
-        rowCount, rowScore
-      ]);
+      tableRows.push(new TableRow({
+        children: [
+          createCell(row.unitName),
+          createCell(row.learningPerformance),
+          createCell(row.learningContent),
+          createCell(row.questionType),
+          createCell(row.cognitiveScores.knowledge.count.toString()),
+          createCell(row.cognitiveScores.knowledge.score.toString()),
+          createCell(row.cognitiveScores.application.count.toString()),
+          createCell(row.cognitiveScores.application.score.toString()),
+          createCell(row.cognitiveScores.evaluation.count.toString()),
+          createCell(row.cognitiveScores.evaluation.score.toString()),
+          createCell(rowCount.toString()),
+          createCell(rowScore.toString()),
+        ]
+      }));
     });
 
-    wsData.push([
-      '分 數 小 計', null, null, null,
-      totals.knowledge.count, totals.knowledge.score,
-      totals.application.count, totals.application.score,
-      totals.evaluation.count, totals.evaluation.score,
-      totals.totalCount, totals.totalScore
-    ]);
+    tableRows.push(new TableRow({
+      children: [
+        createCell('分 數 小 計', { columnSpan: 4 }),
+        createCell(totals.knowledge.count.toString()),
+        createCell(totals.knowledge.score.toString()),
+        createCell(totals.application.count.toString()),
+        createCell(totals.application.score.toString()),
+        createCell(totals.evaluation.count.toString()),
+        createCell(totals.evaluation.score.toString()),
+        createCell(totals.totalCount.toString()),
+        createCell(totals.totalScore.toString()),
+      ]
+    }));
 
-    wsData.push([]);
-    wsData.push(['※ 命題教師請將所命試卷中，每一道試題依照其單元及所屬認知領域的目標層次，填入上表中。']);
-    wsData.push(['※ 表格列數請依需求自行增減。']);
+    const table = new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: tableRows,
+    });
 
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const doc = new Document({
+      sections: [{
+        properties: {},
+        children: [
+          title1, title2, info1, info2, info3, info4, info5, info6, table,
+          new Paragraph({ children: [new TextRun({ text: '※ 命題教師請將所命試卷中，每一道試題依照其單元及所屬認知領域的目標層次，填入上表中。', size: 20, font: 'DFKai-SB' })], spacing: { before: 200 } }),
+          new Paragraph({ children: [new TextRun({ text: '※ 表格列數請依需求自行增減。', size: 20, font: 'DFKai-SB' })] })
+        ]
+      }]
+    });
 
-    ws['!merges'] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: 11 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: 11 } },
-      { s: { r: 7, c: 0 }, e: { r: 9, c: 0 } }, 
-      { s: { r: 7, c: 1 }, e: { r: 7, c: 2 } }, 
-      { s: { r: 8, c: 1 }, e: { r: 8, c: 2 } }, 
-      { s: { r: 7, c: 3 }, e: { r: 9, c: 3 } }, 
-      { s: { r: 7, c: 4 }, e: { r: 7, c: 9 } }, 
-      { s: { r: 8, c: 4 }, e: { r: 8, c: 5 } }, 
-      { s: { r: 8, c: 6 }, e: { r: 8, c: 7 } }, 
-      { s: { r: 8, c: 8 }, e: { r: 8, c: 9 } }, 
-      { s: { r: 7, c: 10 }, e: { r: 9, c: 10 } },
-      { s: { r: 7, c: 11 }, e: { r: 9, c: 11 } },
-      { s: { r: 10 + tableData.length, c: 0 }, e: { r: 10 + tableData.length, c: 3 } }
-    ];
-
-    XLSX.utils.book_append_sheet(wb, ws, "雙向細目表");
-    XLSX.writeFile(wb, "TestAnalysis.xlsx");
+    const blob = await Packer.toBlob(doc);
+    saveAs(blob, "TestAnalysis.docx");
   };
 
   const fileToGenerativePart = (file) => {
@@ -212,28 +257,38 @@ export default function App() {
       const ai = new GoogleGenAI({ apiKey });
       const contents = [];
 
-      if (syllabusFile) {
-        contents.push(await fileToGenerativePart(syllabusFile));
-        contents.push("這是一份課綱參考資料，請根據裡面的學習表現、學習內容編碼與內容來分析後續的考卷。");
+      for (const file of syllabusFiles) {
+        contents.push(await fileToGenerativePart(file));
+      }
+      if (syllabusFiles.length > 0) {
+         contents.push("以上是課綱參考資料，請根據裡面的學習表現、學習內容編碼與內容來分析後續的考卷。");
       }
 
       contents.push(await fileToGenerativePart(testPaperFile));
-      contents.push(`這是一份測驗卷。請分析每一題，並總結歸納出一個雙向細目表。
-      請將分析結果以嚴格的 JSON 陣列格式回傳，每個物件代表一列資料，包含以下屬性：
-      [
-        {
-          "unitName": "單元名稱",
-          "learningPerformance": "學習表現(編碼)",
-          "learningContent": "學習內容(編碼)",
-          "questionType": "題型(例如: 選擇題)",
-          "cognitiveScores": {
-            "knowledge": { "count": 2, "score": 4 },
-            "application": { "count": 1, "score": 2 },
-            "evaluation": { "count": 0, "score": 0 }
+      contents.push(`這是一份測驗卷。請幫我分析這份試卷的每一題，並總結歸納出一個雙向細目表，同時從標題提取基本資訊。
+      請將分析結果以嚴格的 JSON 格式回傳，包含以下屬性：
+      {
+        "academicYear": "112",
+        "semester": "上",
+        "grade": "三",
+        "subject": "國語",
+        "rows": [
+          {
+            "unitName": "單元名稱",
+            "learningPerformance": "學習表現(限填代碼，例如 1-I-1)",
+            "learningContent": "學習內容(限填代碼，例如 Ab-I-1)",
+            "questionType": "題型(例如: 選擇題)",
+            "cognitiveScores": {
+              "knowledge": { "count": 2, "score": 4 },
+              "application": { "count": 1, "score": 2 },
+              "evaluation": { "count": 0, "score": 0 }
+            }
           }
-        }
-      ]
-      注意：認知領域目標層次分為「知識、理解(knowledge)」、「應用、分析(application)」、「評鑑、創造(evaluation)」。count是題數，score是總分。
+        ]
+      }
+      注意：
+      1. 認知領域目標層次分為「知識、理解(knowledge)」、「應用、分析(application)」、「評鑑、創造(evaluation)」。count 是該題型對應目標層次的總題數，score 是這些題目的總佔分。
+      2. 務必讓「學習表現」與「學習內容」只填寫課綱編碼，絕對不要包含任何中文說明文字。
       請只回傳 JSON，不要包含任何 markdown 語法 (不要有 \`\`\`json 等) 或額外的說明文字。`);
 
       const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents });
@@ -241,8 +296,18 @@ export default function App() {
       
       try {
         const parsedData = JSON.parse(responseText.trim().replace(/^```json/, '').replace(/```$/, ''));
-        if (Array.isArray(parsedData) && parsedData.length > 0) {
-          const newData = parsedData.map((row, index) => ({
+        
+        // Auto-fill basic info
+        setBasicInfo(prev => ({
+          ...prev,
+          academicYear: parsedData.academicYear || prev.academicYear,
+          semester: parsedData.semester || prev.semester,
+          grade: parsedData.grade || prev.grade,
+          subject: parsedData.subject || prev.subject,
+        }));
+
+        if (Array.isArray(parsedData.rows) && parsedData.rows.length > 0) {
+          const newData = parsedData.rows.map((row, index) => ({
             id: Date.now() + index,
             unitName: row.unitName || '',
             learningPerformance: row.learningPerformance || '',
@@ -253,7 +318,7 @@ export default function App() {
             }
           }));
           setTableData(newData);
-          setSuccessMsg("AI 分析成功！雙向細目表已自動更新。");
+          setSuccessMsg("AI 分析成功！試卷基本設定與雙向細目表已自動更新。");
         } else {
           setError("AI 分析成功，但無法解析為有效的表格格式，請重試。");
         }
@@ -269,11 +334,9 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#f3f6fa] text-slate-800 pb-20 relative overflow-hidden">
-      {/* Decorative Background Elements */}
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-blue-400/20 blur-[120px] rounded-full pointer-events-none"></div>
       <div className="absolute bottom-[-10%] right-[-5%] w-[40%] h-[40%] bg-indigo-400/20 blur-[100px] rounded-full pointer-events-none"></div>
 
-      {/* Modern Glass Header */}
       <header className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-white/50 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -287,16 +350,15 @@ export default function App() {
               <p className="text-xs font-medium text-slate-500 tracking-wider uppercase">Intelligent Exam Analysis</p>
             </div>
           </div>
-          <button onClick={exportToExcel} className="flex items-center gap-2.5 bg-slate-900 hover:bg-slate-800 text-white px-6 py-2.5 rounded-xl transition-all font-semibold text-sm shadow-xl shadow-slate-900/20 hover:-translate-y-0.5 active:translate-y-0">
-            <Download size={18} />
-            匯出精美 Excel
+          <button onClick={exportToWord} className="flex items-center gap-2.5 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl transition-all font-semibold text-sm shadow-xl shadow-blue-600/20 hover:-translate-y-0.5 active:translate-y-0">
+            <FileText size={18} />
+            匯出精美 Word
           </button>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-10 space-y-8 relative z-10">
         
-        {/* Alerts */}
         {error && (
           <div className="bg-red-50/80 backdrop-blur-md border border-red-200 text-red-700 p-4 rounded-2xl flex items-start gap-3 shadow-lg shadow-red-500/5 animate-in slide-in-from-top-4">
             <AlertCircle className="shrink-0 mt-0.5 text-red-500" size={20} />
@@ -312,10 +374,8 @@ export default function App() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* Left Panel: Settings & AI */}
           <div className="lg:col-span-4 space-y-8 flex flex-col">
             
-            {/* AI Assistant Card - Hero Section */}
             <div className="bg-white rounded-3xl p-1 shadow-xl shadow-indigo-500/10 border border-white/60 relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-blue-500/5 to-purple-500/10 pointer-events-none"></div>
               <div className="bg-white/60 backdrop-blur-2xl p-6 rounded-[1.4rem] h-full flex flex-col relative z-10">
@@ -331,7 +391,7 @@ export default function App() {
                 
                 <div className="space-y-5 flex-1">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-1">API Key</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-1">API Key (不記錄於本地體)</label>
                     <div className="relative">
                       <Key size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input 
@@ -339,7 +399,7 @@ export default function App() {
                         value={apiKey} 
                         onChange={handleApiKeyChange} 
                         className="w-full pl-10 pr-4 py-3 bg-white/80 border border-slate-200/80 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-mono placeholder:font-sans shadow-sm" 
-                        placeholder="輸入 Gemini API Key..." 
+                        placeholder="輸入當次使用的 API Key..." 
                       />
                     </div>
                   </div>
@@ -347,22 +407,22 @@ export default function App() {
                   <div className="space-y-3 pt-2">
                     <label className="flex items-center gap-3 p-4 bg-white/80 border border-slate-200/80 hover:border-indigo-300 hover:bg-indigo-50/50 rounded-xl cursor-pointer transition-all shadow-sm group">
                       <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
-                        <Upload size={18} className="text-indigo-600" />
+                        <FileUp size={18} className="text-indigo-600" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-slate-700 truncate">上傳課綱參考資料</p>
-                        <p className="text-xs text-slate-400 truncate">{syllabusFile ? syllabusFile.name : '選填 (支援 PDF/Word/圖片)'}</p>
+                        <p className="text-sm font-semibold text-slate-700 truncate">上傳課綱參考資料 (可複選)</p>
+                        <p className="text-xs text-slate-400 truncate">{syllabusFiles.length > 0 ? `已選取 ${syllabusFiles.length} 個檔案` : '支援 PDF/Word/圖片多檔上傳'}</p>
                       </div>
-                      <input type="file" className="hidden" accept=".pdf,.docx,.jpg,.png" onChange={e => setSyllabusFile(e.target.files[0])} />
+                      <input type="file" className="hidden" multiple accept=".pdf,.docx,.jpg,.png" onChange={e => setSyllabusFiles(Array.from(e.target.files))} />
                     </label>
 
                     <label className="flex items-center gap-3 p-4 bg-white/80 border border-slate-200/80 hover:border-blue-300 hover:bg-blue-50/50 rounded-xl cursor-pointer transition-all shadow-sm group">
                       <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                        <FileText size={18} className="text-blue-600" />
+                        <Upload size={18} className="text-blue-600" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-slate-700 truncate">上傳測驗考卷</p>
-                        <p className="text-xs text-slate-400 truncate">{testPaperFile ? testPaperFile.name : '必填 (準備交給 AI 分析)'}</p>
+                        <p className="text-xs text-slate-400 truncate">{testPaperFile ? testPaperFile.name : '準備交給 AI 分析'}</p>
                       </div>
                       <input type="file" className="hidden" accept=".pdf,.docx,.jpg,.png" onChange={e => setTestPaperFile(e.target.files[0])} />
                     </label>
@@ -379,11 +439,10 @@ export default function App() {
               </div>
             </div>
 
-            {/* Basic Info Settings */}
             <div className="bg-white/80 backdrop-blur-xl p-6 rounded-3xl shadow-xl shadow-slate-200/40 border border-white/60">
               <h2 className="text-sm font-bold text-slate-800 mb-5 flex items-center gap-2">
                 <Settings size={18} className="text-slate-400" />
-                試卷基本設定
+                試卷基本設定 (自動帶入)
               </h2>
               <div className="space-y-5">
                 <div className="grid grid-cols-2 gap-4">
@@ -429,7 +488,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Right Panel: Table Editor */}
           <div className="lg:col-span-8 flex flex-col h-full">
             <div className="bg-white/90 backdrop-blur-2xl rounded-3xl shadow-xl shadow-slate-200/50 border border-white/80 overflow-hidden flex flex-col flex-1">
               
@@ -489,7 +547,6 @@ export default function App() {
                             <input type="text" value={row.questionType} onChange={(e) => handleTableDataChange(row.id, 'questionType', e.target.value)} className="w-full bg-slate-50/50 border border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded-lg px-3 py-2 outline-none transition-all font-medium" placeholder="選擇題" />
                           </td>
                           
-                          {/* Knowledge */}
                           <td className="p-2 border-r border-slate-100 w-16 bg-blue-50/10">
                             <input type="number" min="0" value={row.cognitiveScores.knowledge.count || ''} onChange={(e) => handleCognitiveScoreChange(row.id, 'knowledge', 'count', e.target.value)} className="w-full text-center bg-transparent border border-transparent hover:border-blue-200 focus:border-blue-500 focus:bg-white rounded-md py-1.5 outline-none transition-all font-medium" placeholder="0" />
                           </td>
@@ -497,7 +554,6 @@ export default function App() {
                             <input type="number" min="0" value={row.cognitiveScores.knowledge.score || ''} onChange={(e) => handleCognitiveScoreChange(row.id, 'knowledge', 'score', e.target.value)} className="w-full text-center bg-transparent border border-transparent hover:border-blue-200 focus:border-blue-500 focus:bg-white rounded-md py-1.5 outline-none transition-all font-bold text-blue-600" placeholder="0" />
                           </td>
 
-                          {/* Application */}
                           <td className="p-2 border-r border-slate-100 w-16 bg-indigo-50/10">
                             <input type="number" min="0" value={row.cognitiveScores.application.count || ''} onChange={(e) => handleCognitiveScoreChange(row.id, 'application', 'count', e.target.value)} className="w-full text-center bg-transparent border border-transparent hover:border-indigo-200 focus:border-indigo-500 focus:bg-white rounded-md py-1.5 outline-none transition-all font-medium" placeholder="0" />
                           </td>
@@ -505,7 +561,6 @@ export default function App() {
                             <input type="number" min="0" value={row.cognitiveScores.application.score || ''} onChange={(e) => handleCognitiveScoreChange(row.id, 'application', 'score', e.target.value)} className="w-full text-center bg-transparent border border-transparent hover:border-indigo-200 focus:border-indigo-500 focus:bg-white rounded-md py-1.5 outline-none transition-all font-bold text-indigo-600" placeholder="0" />
                           </td>
 
-                          {/* Evaluation */}
                           <td className="p-2 border-r border-slate-100 w-16 bg-violet-50/10">
                             <input type="number" min="0" value={row.cognitiveScores.evaluation.count || ''} onChange={(e) => handleCognitiveScoreChange(row.id, 'evaluation', 'count', e.target.value)} className="w-full text-center bg-transparent border border-transparent hover:border-violet-200 focus:border-violet-500 focus:bg-white rounded-md py-1.5 outline-none transition-all font-medium" placeholder="0" />
                           </td>
@@ -525,7 +580,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Enhanced Footer Totals */}
               <div className="bg-slate-900 border-t border-slate-800 p-6 flex flex-col md:flex-row items-center justify-between gap-6 text-white shrink-0 relative z-20">
                 <div className="flex items-center gap-8">
                   <div>
