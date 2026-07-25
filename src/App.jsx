@@ -36,6 +36,7 @@ export default function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [syllabusFiles, setSyllabusFiles] = useState([]);
   const [testPaperFile, setTestPaperFile] = useState(null);
+  const [showApiHelp, setShowApiHelp] = useState(false);
 
   const handleReset = () => {
     if (window.confirm("確定要清除所有上傳檔案與表格資料嗎？")) {
@@ -75,6 +76,7 @@ export default function App() {
 
   const handleApiKeyChange = (e) => {
     setApiKey(e.target.value);
+    setShowApiHelp(false);
   };
 
   const handleBasicInfoChange = (e) => {
@@ -304,7 +306,12 @@ export default function App() {
   };
 
   const handleAIAnalysis = async () => {
-    if (!apiKey) { setError("請先輸入您的 Gemini API Key！"); setSuccessMsg(null); return; }
+    if (!apiKey) { 
+      setError("請先填寫 API Key 才能進行自動分析！"); 
+      setShowApiHelp(true);
+      setSuccessMsg(null); 
+      return; 
+    }
     if (!testPaperFile) { setError("請上傳一份試卷檔案供 AI 進行分析！"); setSuccessMsg(null); return; }
 
     setIsAnalyzing(true); setError(null); setSuccessMsg(null);
@@ -479,7 +486,7 @@ export default function App() {
                         placeholder="請貼上您的 Google Gemini API Key..." 
                       />
                     </div>
-                    {!apiKey && (
+                    {showApiHelp && (
                       <div className="mt-2 p-3 bg-indigo-50/50 border border-indigo-100 rounded-xl flex items-start gap-2.5 animate-in fade-in">
                         <Info size={16} className="text-indigo-500 shrink-0 mt-0.5" />
                         <div className="text-xs text-indigo-900/80 space-y-1.5 leading-relaxed">
