@@ -730,34 +730,33 @@ export default function App() {
 
       {showApiHelp && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-[2rem] shadow-2xl max-w-[360px] w-full p-8 flex flex-col items-center animate-in zoom-in-95 duration-200 relative">
-            <div className="w-16 h-16 bg-[#f4f5fc] rounded-full flex items-center justify-center mb-4">
-              <AlertCircle size={28} className="text-[#5942f6]" />
+          <div className="bg-white rounded-[2rem] shadow-2xl max-w-sm w-full p-8 flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mb-5">
+              <AlertCircle size={32} strokeWidth={2.5} />
             </div>
             
-            <h3 className="text-xl font-bold text-[#1c2534] mb-3">需要 API Key</h3>
+            <h3 className="text-2xl font-black text-slate-800 mb-4 tracking-tight">需要 API Key</h3>
             
-            <p className="text-[#576375] text-sm text-center leading-relaxed mb-6">
-              系統需要 Google Gemini API Key 才能分析考卷與產出雙向細目表。
+            <p className="text-sm text-slate-600 leading-relaxed mb-6 font-medium">
+              系統需要 Google Gemini API Key 才能閱讀與分析考卷。
             </p>
             
-            <div className="w-full text-left mb-8 space-y-1">
-              <p className="text-sm">
-                <span className="text-red-500 font-bold">⚠️ 費用提醒：</span>
+            <div className="w-full text-left mb-8">
+              <p className="font-bold text-red-500 mb-1.5 flex items-center gap-1.5 text-sm">
+                <span className="text-base">⚠️</span> 費用提醒：
               </p>
-              <p className="text-[#576375] text-sm leading-relaxed">
+              <p className="text-xs text-slate-500 leading-relaxed font-medium">
                 Gemini API 目前提供一定的免費額度，但若用量大或綁定信用卡，可能會產生費用，請務必留意官方計費標準。
               </p>
             </div>
             
-            <div className="w-full flex flex-col gap-3">
-              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="w-full py-3.5 bg-[#5942f6] hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors text-center shadow-sm">
-                前往申請 API Key
-              </a>
-              <button onClick={() => setShowApiHelp(false)} className="w-full py-3.5 bg-[#f3f4f6] hover:bg-gray-200 text-[#576375] text-sm font-bold rounded-xl transition-colors">
-                我知道了
-              </button>
-            </div>
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="w-full py-3.5 bg-[#5b45ff] hover:bg-[#4b35e0] text-white font-bold rounded-xl transition-all shadow-md shadow-indigo-500/20 mb-3 flex items-center justify-center tracking-wide">
+              前往申請 API Key
+            </a>
+            
+            <button onClick={() => setShowApiHelp(false)} className="w-full py-3.5 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold rounded-xl transition-all tracking-wide">
+              我知道了
+            </button>
           </div>
         </div>
       )}
