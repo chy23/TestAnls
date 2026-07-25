@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, FileText, Download, Plus, Trash2, Settings, Table as TableIcon, Sparkles, Key, AlertCircle, Loader2, LayoutGrid, CheckCircle2, FileUp } from 'lucide-react';
+import { Upload, FileText, Download, Plus, Trash2, Settings, Table as TableIcon, Sparkles, Key, AlertCircle, Loader2, LayoutGrid, CheckCircle2, FileUp, ExternalLink } from 'lucide-react';
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, VerticalAlign } from 'docx';
 import { saveAs } from 'file-saver';
 import { GoogleGenAI } from '@google/genai';
@@ -36,6 +36,18 @@ export default function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [syllabusFiles, setSyllabusFiles] = useState([]);
   const [testPaperFile, setTestPaperFile] = useState(null);
+  const [useCustomApi, setUseCustomApi] = useState(true);
+
+  const handleToggleCustomApi = (value) => {
+    if (!value) {
+      if (window.confirm("⚠️ 注意：如果不填寫自己的 API Key，系統將使用預設的共用額度。\n\n共用額度可能會因為多人同時使用而導致【分析速度緩慢】甚至【額度用盡而失敗】。\n\n強烈建議您花 1 分鐘免費申請自己的 API Key 以確保順暢！\n\n您確定要繼續使用系統預設額度嗎？")) {
+        setUseCustomApi(false);
+        setApiKey('');
+      }
+    } else {
+      setUseCustomApi(true);
+    }
+  };
 
   const handleReset = () => {
     if (window.confirm("確定要清除所有上傳檔案與表格資料嗎？")) {
@@ -304,7 +316,12 @@ export default function App() {
   };
 
   const handleAIAnalysis = async () => {
-    if (!apiKey) { setError("請先輸入您的 Gemini API Key！"); setSuccessMsg(null); return; }
+    const finalApiKey = useCustomApi ? apiKey : (import.meta.env.VITE_DEFAULT_API_KEY || "");
+    if (!finalApiKey) { 
+      setError(useCustomApi ? "請先輸入您的 Gemini API Key！" : "系統尚未設定預設 API Key，請切換為「使用專屬 API Key」並自行申請！"); 
+      setSuccessMsg(null); 
+      return; 
+    }
     if (!testPaperFile) { setError("請上傳一份試卷檔案供 AI 進行分析！"); setSuccessMsg(null); return; }
 
     setIsAnalyzing(true); setError(null); setSuccessMsg(null);
@@ -465,18 +482,56 @@ export default function App() {
                 </div>
                 
                 <div className="space-y-5 flex-1">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-1">API Key (不記錄於本地體)</label>
-                    <div className="relative">
-                      <Key size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input 
-                        type="password" 
-                        value={apiKey} 
-                        onChange={handleApiKeyChange} 
-                        className="w-full pl-10 pr-4 py-3 bg-white/80 border border-slate-200/80 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-mono placeholder:font-sans shadow-sm" 
-                        placeholder="輸入當次使用的 API Key..." 
-                      />
+                  <div className="space-y-3">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-1">API Key 設定</label>
+                    
+                    <div className="flex flex-col gap-2 p-1">
+                      <label className="flex items-center gap-2 cursor-pointer group">
+                        <div className="relative flex items-center justify-center">
+                          <input type="radio" checked={useCustomApi} onChange={() => handleToggleCustomApi(true)} className="peer w-4 h-4 opacity-0 absolute" />
+                          <div className="w-4 h-4 rounded-full border-2 border-slate-300 peer-checked:border-indigo-600 flex items-center justify-center transition-all">
+                            <div className="w-2 h-2 rounded-full bg-indigo-600 scale-0 peer-checked:scale-100 transition-transform"></div>
+                          </div>
+                        </div>
+                        <span className={`text-sm font-semibold transition-colors ${useCustomApi ? 'text-indigo-700' : 'text-slate-600 group-hover:text-slate-800'}`}>使用專屬 API Key (強烈推薦)</span>
+                      </label>
+                      
+                      <label className="flex items-center gap-2 cursor-pointer group">
+                        <div className="relative flex items-center justify-center">
+                          <input type="radio" checked={!useCustomApi} onChange={() => handleToggleCustomApi(false)} className="peer w-4 h-4 opacity-0 absolute" />
+                          <div className="w-4 h-4 rounded-full border-2 border-slate-300 peer-checked:border-indigo-600 flex items-center justify-center transition-all">
+                            <div className="w-2 h-2 rounded-full bg-indigo-600 scale-0 peer-checked:scale-100 transition-transform"></div>
+                          </div>
+                        </div>
+                        <span className={`text-sm font-medium transition-colors ${!useCustomApi ? 'text-indigo-700' : 'text-slate-600 group-hover:text-slate-800'}`}>不使用 API Key (共用系統預設額度)</span>
+                      </label>
                     </div>
+
+                    {useCustomApi ? (
+                      <div className="animate-in fade-in slide-in-from-top-2 duration-300 space-y-2">
+                        <div className="relative">
+                          <Key size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input 
+                            type="password" 
+                            value={apiKey} 
+                            onChange={handleApiKeyChange} 
+                            className="w-full pl-10 pr-4 py-3 bg-white/80 border border-slate-200/80 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-mono placeholder:font-sans shadow-sm" 
+                            placeholder="輸入當次使用的 API Key..." 
+                          />
+                        </div>
+                        <div className="pl-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+                          <span>不知道怎麼申請？</span>
+                          <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-indigo-600 font-semibold hover:text-indigo-700 hover:underline">
+                            點此免費申請 Google Gemini API Key <ExternalLink size={12} />
+                          </a>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="animate-in fade-in slide-in-from-top-2 duration-300 p-3 bg-amber-50 border border-amber-200/60 rounded-xl text-amber-800 text-xs flex items-start gap-2.5 shadow-sm">
+                        <AlertCircle size={16} className="shrink-0 mt-0.5 text-amber-500" />
+                        <p className="leading-relaxed font-medium">您目前選擇不填寫 API Key。若系統共用額度耗盡，AI 分析可能會失敗或沒有反應。若遇到此情況，建議您切換回上方「使用專屬 API Key」並自行申請。</p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-3 pt-2">
