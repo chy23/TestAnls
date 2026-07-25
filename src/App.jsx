@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, FileText, Download, Plus, Trash2, Settings, Table as TableIcon, Sparkles, Key, AlertCircle, Loader2, LayoutGrid, CheckCircle2, FileUp, ExternalLink } from 'lucide-react';
+import { Upload, FileText, Download, Plus, Trash2, Settings, Table as TableIcon, Sparkles, Key, AlertCircle, Loader2, LayoutGrid, CheckCircle2, FileUp, ExternalLink, Info } from 'lucide-react';
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, VerticalAlign } from 'docx';
 import { saveAs } from 'file-saver';
 import { GoogleGenAI } from '@google/genai';
@@ -466,7 +466,9 @@ export default function App() {
                 
                 <div className="space-y-5 flex-1">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-1">API Key (不記錄於本地體)</label>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-1 flex justify-between items-center">
+                      <span>API Key (不記錄於本地體)</span>
+                    </label>
                     <div className="relative">
                       <Key size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input 
@@ -474,15 +476,23 @@ export default function App() {
                         value={apiKey} 
                         onChange={handleApiKeyChange} 
                         className="w-full pl-10 pr-4 py-3 bg-white/80 border border-slate-200/80 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-mono placeholder:font-sans shadow-sm" 
-                        placeholder="輸入當次使用的 API Key..." 
+                        placeholder="請貼上您的 Google Gemini API Key..." 
                       />
                     </div>
-                    <div className="pl-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
-                      <span>不知道怎麼申請？</span>
-                      <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-indigo-600 font-semibold hover:text-indigo-700 hover:underline">
-                        點此免費申請 Google Gemini API Key <ExternalLink size={12} />
-                      </a>
-                    </div>
+                    {!apiKey && (
+                      <div className="mt-2 p-3 bg-indigo-50/50 border border-indigo-100 rounded-xl flex items-start gap-2.5 animate-in fade-in">
+                        <Info size={16} className="text-indigo-500 shrink-0 mt-0.5" />
+                        <div className="text-xs text-indigo-900/80 space-y-1.5 leading-relaxed">
+                          <p className="font-semibold text-indigo-700">為什麼需要 API Key？會收費嗎？</p>
+                          <p>為了確保分析速度與品質，本系統採用您專屬的 Google Gemini AI 進行分析。<strong>一般個人使用下，Gemini API 提供的免費額度非常充足，完全不需要付費！</strong></p>
+                          <div className="pt-1">
+                            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-white bg-indigo-500 hover:bg-indigo-600 px-3 py-1.5 rounded-lg font-medium transition-colors">
+                              點此免費申請 API Key <ExternalLink size={12} />
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-3 pt-2">
