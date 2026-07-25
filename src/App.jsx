@@ -36,6 +36,40 @@ export default function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [syllabusFiles, setSyllabusFiles] = useState([]);
   const [testPaperFile, setTestPaperFile] = useState(null);
+
+  const handleReset = () => {
+    if (window.confirm("確定要清除所有上傳檔案與表格資料嗎？")) {
+      setSyllabusFiles([]);
+      setTestPaperFile(null);
+      setTableData([
+        {
+          id: Date.now(),
+          unitName: '',
+          learningPerformance: '',
+          learningContent: '',
+          questionType: '選擇題',
+          cognitiveScores: {
+            knowledge: { count: 0, score: 0 },
+            application: { count: 0, score: 0 },
+            evaluation: { count: 0, score: 0 }
+          }
+        }
+      ]);
+      setBasicInfo({
+        academicYear: '112',
+        semester: '上',
+        grade: '三',
+        subject: '數學',
+        scope: '第一單元至第五單元',
+        time: '40分鐘',
+        setter: '王大明老師',
+        reviewer: '李小華老師'
+      });
+      setError(null);
+      setSuccessMsg("資料已全數清除，可以重新開始分析了！");
+    }
+  };
+
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
 
@@ -470,13 +504,23 @@ export default function App() {
                   </div>
                 </div>
 
-                <button 
-                  onClick={handleAIAnalysis}
-                  disabled={isAnalyzing || !testPaperFile}
-                  className="mt-6 w-full py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:hover:translate-y-0 flex items-center justify-center gap-2"
-                >
-                  {isAnalyzing ? <><Loader2 size={18} className="animate-spin" /> 正在深度分析中...</> : '開始 AI 自動分析'}
-                </button>
+                <div className="mt-6 flex flex-col gap-3">
+                  <button 
+                    onClick={handleAIAnalysis}
+                    disabled={isAnalyzing || !testPaperFile}
+                    className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:hover:translate-y-0 flex items-center justify-center gap-2"
+                  >
+                    {isAnalyzing ? <><Loader2 size={18} className="animate-spin" /> 正在深度分析中...</> : '開始 AI 自動分析'}
+                  </button>
+                  
+                  <button 
+                    onClick={handleReset}
+                    className="w-full py-3 bg-white border border-rose-200 text-rose-600 font-bold rounded-xl shadow-sm hover:bg-rose-50 hover:border-rose-300 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Trash2 size={18} />
+                    清除資料並重新開始
+                  </button>
+                </div>
               </div>
             </div>
 
