@@ -136,8 +136,13 @@ export default function App() {
   const exportToWord = async () => {
     const cellMargin = { top: 100, bottom: 100, left: 100, right: 100 };
     const createCell = (text, options = {}) => {
+      const lines = (text || '').split('\n');
+      const paragraphs = lines.map(line => new Paragraph({ 
+        children: [new TextRun({ text: line, font: 'DFKai-SB', size: 24 })], 
+        alignment: AlignmentType.CENTER 
+      }));
       return new TableCell({
-        children: [new Paragraph({ children: [new TextRun({ text: text || '', font: 'DFKai-SB', size: 24 })], alignment: AlignmentType.CENTER })],
+        children: paragraphs,
         verticalAlign: VerticalAlign.CENTER,
         margins: cellMargin,
         ...options
@@ -236,6 +241,7 @@ export default function App() {
 
     const table = new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
+      columnWidths: [1800, 1500, 1500, 1000, 800, 800, 800, 800, 800, 800, 800, 800],
       rows: tableRows,
     });
 
@@ -536,8 +542,8 @@ export default function App() {
               </div>
 
               <div className="flex-1 overflow-auto p-4 custom-scrollbar">
-                <div className="min-w-[800px] border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm bg-white">
-                  <table className="w-full text-sm text-left border-collapse">
+                <div className="border border-slate-200/60 rounded-2xl overflow-x-auto shadow-sm bg-white">
+                  <table className="w-[1200px] text-sm text-left border-collapse table-fixed">
                     <thead className="bg-slate-50/80">
                       <tr>
                         <th className="px-4 py-4 font-bold text-slate-700 border-b border-slate-200" rowSpan="2">單元名稱</th>
