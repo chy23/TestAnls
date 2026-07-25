@@ -49,10 +49,19 @@ export default function App() {
   };
 
   const handleTableDataChange = (id, field, value) => {
-    setTableData(prev => prev.map(row => {
-      if (row.id === id) return { ...row, [field]: value };
-      return row;
-    }));
+    setTableData(prev => {
+      const targetRow = prev.find(r => r.id === id);
+      if (!targetRow) return prev;
+      const oldUnitName = targetRow.unitName;
+      return prev.map(row => {
+        if (field === 'unitName' || field === 'learningPerformance' || field === 'learningContent') {
+          if (row.unitName === oldUnitName) return { ...row, [field]: value };
+        } else if (row.id === id) {
+          return { ...row, [field]: value };
+        }
+        return row;
+      });
+    });
   };
 
   const handleCognitiveScoreChange = (id, domain, type, value) => {
@@ -184,25 +193,31 @@ export default function App() {
 
     const tableRows = [headerRow1, headerRow2, headerRow3];
 
-    tableData.forEach(row => {
+    tableData.forEach((row, index) => {
+      const isFirstOfUnit = index === 0 || tableData[index - 1].unitName !== row.unitName;
+      const rowSpanCount = isFirstOfUnit ? tableData.filter(r => r.unitName === row.unitName).length : 0;
       const rowCount = row.cognitiveScores.knowledge.count + row.cognitiveScores.application.count + row.cognitiveScores.evaluation.count;
       const rowScore = row.cognitiveScores.knowledge.score + row.cognitiveScores.application.score + row.cognitiveScores.evaluation.score;
-      tableRows.push(new TableRow({
-        children: [
-          createCell(row.unitName),
-          createCell(row.learningPerformance),
-          createCell(row.learningContent),
-          createCell(row.questionType),
-          createCell(row.cognitiveScores.knowledge.count.toString()),
-          createCell(row.cognitiveScores.knowledge.score.toString()),
-          createCell(row.cognitiveScores.application.count.toString()),
-          createCell(row.cognitiveScores.application.score.toString()),
-          createCell(row.cognitiveScores.evaluation.count.toString()),
-          createCell(row.cognitiveScores.evaluation.score.toString()),
-          createCell(rowCount.toString()),
-          createCell(rowScore.toString()),
-        ]
-      }));
+      
+      const children = [];
+      if (isFirstOfUnit) {
+        children.push(createCell(row.unitName, { rowSpan: rowSpanCount }));
+        children.push(createCell(row.learningPerformance, { rowSpan: rowSpanCount }));
+        children.push(createCell(row.learningContent, { rowSpan: rowSpanCount }));
+      }
+      children.push(
+        createCell(row.questionType),
+        createCell(row.cognitiveScores.knowledge.count.toString()),
+        createCell(row.cognitiveScores.knowledge.score.toString()),
+        createCell(row.cognitiveScores.application.count.toString()),
+        createCell(row.cognitiveScores.application.score.toString()),
+        createCell(row.cognitiveScores.evaluation.count.toString()),
+        createCell(row.cognitiveScores.evaluation.score.toString()),
+        createCell(rowCount.toString()),
+        createCell(rowScore.toString())
+      );
+
+      tableRows.push(new TableRow({ children }));
     });
 
     tableRows.push(new TableRow({
@@ -314,16 +329,28 @@ export default function App() {
         }));
 
         if (Array.isArray(parsedData.rows) && parsedData.rows.length > 0) {
-          const newData = parsedData.rows.map((row, index) => ({
-            id: Date.now() + index,
-            unitName: row.unitName || '',
-            learningPerformance: row.learningPerformance || '',
-            learningContent: row.learningContent || '',
-            questionType: row.questionType || '選擇題',
-            cognitiveScores: row.cognitiveScores || {
-              knowledge: { count: 0, score: 0 }, application: { count: 0, score: 0 }, evaluation: { count: 0, score: 0 }
-            }
-          }));
+          // Normalize rows so that same unitName has identical learningPerformance and learningContent
+          const unitsMap = {};
+          parsedData.rows.forEach(row => {
+            const uName = row.unitName || '未命名單元';
+            if (!unitsMap[uName]) unitsMap[uName] = { perf: new Set(), cont: new Set() };
+            if (row.learningPerformance) row.learningPerformance.split(/[,\n、]/).map(s => s.trim()).filter(Boolean).forEach(s => unitsMap[uName].perf.add(s));
+            if (row.learningContent) row.learningContent.split(/[,\n、]/).map(s => s.trim()).filter(Boolean).forEach(s => unitsMap[uName].cont.add(s));
+          });
+
+          const newData = parsedData.rows.map((row, index) => {
+            const uName = row.unitName || '未命名單元';
+            return {
+              id: Date.now() + index,
+              unitName: uName,
+              learningPerformance: Array.from(unitsMap[uName].perf).join('\n'),
+              learningContent: Array.from(unitsMap[uName].cont).join('\n'),
+              questionType: row.questionType || '選擇題',
+              cognitiveScores: row.cognitiveScores || {
+                knowledge: { count: 0, score: 0 }, application: { count: 0, score: 0 }, evaluation: { count: 0, score: 0 }
+              }
+            };
+          });
           setTableData(newData);
           setSuccessMsg("AI 分析成功！試卷基本設定與雙向細目表已自動更新。");
         } else {
@@ -539,17 +566,24 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {tableData.map((row) => (
+                      {tableData.map((row, index) => {
+                        const isFirstOfUnit = index === 0 || tableData[index - 1].unitName !== row.unitName;
+                        const rowSpanCount = isFirstOfUnit ? tableData.filter(r => r.unitName === row.unitName).length : 0;
+                        return (
                         <tr key={row.id} className="hover:bg-slate-50/50 transition-colors group">
-                          <td className="p-2 border-r border-slate-100 w-36">
-                            <input type="text" value={row.unitName} onChange={(e) => handleTableDataChange(row.id, 'unitName', e.target.value)} className="w-full bg-slate-50/50 border border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded-lg px-3 py-2 outline-none transition-all font-medium" placeholder="單元名稱" />
-                          </td>
-                          <td className="p-2 border-r border-slate-100 w-28">
-                            <input type="text" value={row.learningPerformance} onChange={(e) => handleTableDataChange(row.id, 'learningPerformance', e.target.value)} className="w-full bg-slate-50/50 border border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded-lg px-3 py-2 outline-none transition-all font-medium" placeholder="1-I-1" />
-                          </td>
-                          <td className="p-2 border-r border-slate-200 w-28">
-                            <input type="text" value={row.learningContent} onChange={(e) => handleTableDataChange(row.id, 'learningContent', e.target.value)} className="w-full bg-slate-50/50 border border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded-lg px-3 py-2 outline-none transition-all font-medium" placeholder="Ab-I-1" />
-                          </td>
+                          {isFirstOfUnit && (
+                            <>
+                              <td className="p-2 border-r border-slate-100 w-36" rowSpan={rowSpanCount}>
+                                <textarea value={row.unitName} onChange={(e) => handleTableDataChange(row.id, 'unitName', e.target.value)} className="w-full bg-slate-50/50 border border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded-lg px-3 py-2 outline-none transition-all font-medium resize-none" rows={rowSpanCount > 1 ? 2 : 1} placeholder="單元名稱" />
+                              </td>
+                              <td className="p-2 border-r border-slate-100 w-28" rowSpan={rowSpanCount}>
+                                <textarea value={row.learningPerformance} onChange={(e) => handleTableDataChange(row.id, 'learningPerformance', e.target.value)} className="w-full bg-slate-50/50 border border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded-lg px-3 py-2 outline-none transition-all font-medium resize-none text-xs" rows={rowSpanCount > 1 ? 2 : 1} placeholder="1-I-1" />
+                              </td>
+                              <td className="p-2 border-r border-slate-200 w-28" rowSpan={rowSpanCount}>
+                                <textarea value={row.learningContent} onChange={(e) => handleTableDataChange(row.id, 'learningContent', e.target.value)} className="w-full bg-slate-50/50 border border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded-lg px-3 py-2 outline-none transition-all font-medium resize-none text-xs" rows={rowSpanCount > 1 ? 2 : 1} placeholder="Ab-I-1" />
+                              </td>
+                            </>
+                          )}
                           <td className="p-2 border-r border-slate-200 w-28">
                             <input type="text" value={row.questionType} onChange={(e) => handleTableDataChange(row.id, 'questionType', e.target.value)} className="w-full bg-slate-50/50 border border-transparent hover:border-slate-200 focus:border-blue-500 focus:bg-white rounded-lg px-3 py-2 outline-none transition-all font-medium" placeholder="選擇題" />
                           </td>
@@ -581,7 +615,8 @@ export default function App() {
                              </button>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
