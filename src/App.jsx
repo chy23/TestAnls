@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, FileText, Download, Plus, Trash2, Settings, Table as TableIcon, Sparkles, Key, AlertCircle, Loader2, LayoutGrid, CheckCircle2, FileUp, ExternalLink, Info } from 'lucide-react';
+import { Upload, FileText, Download, Plus, Trash2, Settings, Table as TableIcon, Sparkles, Key, AlertCircle, Loader2, LayoutGrid, CheckCircle2, FileUp, ExternalLink, Info, X } from 'lucide-react';
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, VerticalAlign } from 'docx';
 import { saveAs } from 'file-saver';
 import { GoogleGenAI } from '@google/genai';
@@ -486,20 +486,6 @@ export default function App() {
                         placeholder="請貼上您的 Google Gemini API Key..." 
                       />
                     </div>
-                    {showApiHelp && (
-                      <div className="mt-2 p-3 bg-indigo-50/50 border border-indigo-100 rounded-xl flex items-start gap-2.5 animate-in fade-in">
-                        <Info size={16} className="text-indigo-500 shrink-0 mt-0.5" />
-                        <div className="text-xs text-indigo-900/80 space-y-1.5 leading-relaxed">
-                          <p className="font-semibold text-indigo-700">為什麼需要 API Key？會收費嗎？</p>
-                          <p>為了確保分析速度與品質，本系統採用您專屬的 Google Gemini AI 進行分析。<strong>一般個人使用下，Gemini API 提供的免費額度非常充足，完全不需要付費！</strong></p>
-                          <div className="pt-1">
-                            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-white bg-indigo-500 hover:bg-indigo-600 px-3 py-1.5 rounded-lg font-medium transition-colors">
-                              點此免費申請 API Key <ExternalLink size={12} />
-                            </a>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
 
                   <div className="space-y-3 pt-2">
@@ -741,6 +727,47 @@ export default function App() {
 
         </div>
       </main>
+
+      {showApiHelp && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center shrink-0">
+                  <Key size={20} />
+                </div>
+                <h3 className="text-lg font-bold text-slate-800">需要您的 API Key</h3>
+              </div>
+              <button onClick={() => setShowApiHelp(false)} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-lg transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="text-sm text-slate-600 leading-relaxed space-y-2">
+              <p>
+                為了確保分析速度與品質，本系統需要您專屬的 Google Gemini API Key 才能進行分析。
+              </p>
+              <p>
+                <strong>會收費嗎？</strong><br/>
+                請放心，<span className="text-indigo-600 font-semibold">一般個人使用下，官方提供的免費額度非常充足，完全不需要付費！</span>
+              </p>
+            </div>
+            
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col gap-3">
+               <p className="text-sm font-semibold text-slate-700">還沒有 API Key 嗎？</p>
+               <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors shadow-sm">
+                  點此免費申請 Google Gemini API Key <ExternalLink size={16} />
+               </a>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button onClick={() => setShowApiHelp(false)} className="px-5 py-2.5 text-sm font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors">
+                我知道了
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
