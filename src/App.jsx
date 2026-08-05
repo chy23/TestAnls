@@ -1,46 +1,69 @@
 // 網站建立自楊家驊老師 The website was created by Teacher ChiahuaYang
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Upload, FileText, Download, Plus, Trash2, Settings, Table as TableIcon, Sparkles, Key, AlertCircle, Loader2, LayoutGrid, CheckCircle2, FileUp, ExternalLink, Info, X } from 'lucide-react';
-import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, VerticalAlign } from 'docx';
 import { saveAs } from 'file-saver';
-import { GoogleGenAI } from '@google/genai';
 import syllabusData from './data/syllabus.json';
 
 export default function App() {
   const [apiKey, setApiKey] = useState('');
-  const [basicInfo, setBasicInfo] = useState({
-    academicYear: '',
-    semester: '',
-    grade: '',
-    subject: '',
-    scope: '',
-    time: '40 分鐘',
-    setter: '',
-    reviewer: ''
+  const [basicInfo, setBasicInfo] = useState(() => {
+    const saved = localStorage.getItem('testAnls_basicInfo');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    }
+    return {
+      academicYear: '',
+      semester: '',
+      grade: '',
+      subject: '',
+      scope: '',
+      time: '40 分鐘',
+      setter: '',
+      reviewer: ''
+    };
   });
 
-  const [tableData, setTableData] = useState([
-    {
-      id: 1,
-      unitName: '',
-      learningPerformance: '',
-      learningContent: '',
-      questionType: '選擇題',
-      cognitiveScores: {
-        knowledge: { count: 0, score: 0 },
-        application: { count: 0, score: 0 },
-        evaluation: { count: 0, score: 0 }
-      }
+  const [tableData, setTableData] = useState(() => {
+    const saved = localStorage.getItem('testAnls_tableData');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
     }
-  ]);
+    return [
+      {
+        id: 1,
+        unitName: '',
+        learningPerformance: '',
+        learningContent: '',
+        questionType: '選擇題',
+        cognitiveScores: {
+          knowledge: { count: 0, score: 0 },
+          application: { count: 0, score: 0 },
+          evaluation: { count: 0, score: 0 }
+        }
+      }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('testAnls_basicInfo', JSON.stringify(basicInfo));
+  }, [basicInfo]);
+
+  useEffect(() => {
+    localStorage.setItem('testAnls_tableData', JSON.stringify(tableData));
+  }, [tableData]);
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [loadingText, setLoadingText] = useState('準備分析中...');
   const [syllabusFiles, setSyllabusFiles] = useState([]);
   const [testPaperFile, setTestPaperFile] = useState(null);
   const [showApiHelp, setShowApiHelp] = useState(false);
+  const [isDraggingSyllabus, setIsDraggingSyllabus] = useState(false);
+  const [isDraggingTestPaper, setIsDraggingTestPaper] = useState(false);
 
   const handleReset = () => {
     if (window.confirm("確定要清除所有上傳檔案與表格資料嗎？")) {
+      localStorage.removeItem('testAnls_basicInfo');
+      localStorage.removeItem('testAnls_tableData');
       setSyllabusFiles([]);
       setTestPaperFile(null);
       setTableData([
@@ -72,12 +95,52 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    let interval;
+    if (isAnalyzing) {
+      const texts = ['正在閱讀課綱與試卷...', '正在分析試卷內容...', '正在統整認知層次...', '正在產生雙向細目表...'];
+      let i = 0;
+      setLoadingText(texts[0]);
+      interval = setInterval(() => {
+        i = (i + 1) % texts.length;
+        setLoadingText(texts[i]);
+      }, 3000);
+    }
+    return () => clearInterval(interval);
+  }, [isAnalyzing]);
+
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
 
   const handleApiKeyChange = (e) => {
     setApiKey(e.target.value);
     setShowApiHelp(false);
+  };
+
+  const handleDragOver = (e, setDragging) => {
+    e.preventDefault();
+    setDragging(true);
+  };
+
+  const handleDragLeave = (e, setDragging) => {
+    e.preventDefault();
+    setDragging(false);
+  };
+
+  const handleDropSyllabus = (e) => {
+    e.preventDefault();
+    setIsDraggingSyllabus(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      setSyllabusFiles(Array.from(e.dataTransfer.files));
+    }
+  };
+
+  const handleDropTestPaper = (e) => {
+    e.preventDefault();
+    setIsDraggingTestPaper(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      setTestPaperFile(e.dataTransfer.files[0]);
+    }
   };
 
   const handleBasicInfoChange = (e) => {
@@ -171,6 +234,7 @@ export default function App() {
 
   // Word Export matching PDF perfectly
   const exportToWord = async () => {
+    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, VerticalAlign } = await import('docx');
     const cellMargin = { top: 100, bottom: 100, left: 100, right: 100 };
     const createCell = (text, options = {}) => {
       const lines = (text || '').split('\n');
@@ -318,6 +382,7 @@ export default function App() {
     setIsAnalyzing(true); setError(null); setSuccessMsg(null);
 
     try {
+      const { GoogleGenAI } = await import('@google/genai');
       const ai = new GoogleGenAI({ apiKey });
       const contents = [];
 
@@ -362,7 +427,11 @@ export default function App() {
       2. 務必讓「學習表現」與「學習內容」只填寫課綱編碼，絕對不要包含任何中文說明文字。
       請只回傳 JSON，不要包含任何 markdown 語法 (不要有 \`\`\`json 等) 或額外的說明文字。`);
 
-      const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents });
+      const response = await ai.models.generateContent({ 
+        model: 'gemini-2.5-flash', 
+        contents,
+        config: { responseMimeType: "application/json" }
+      });
       const responseText = response.text;
       
       try {
@@ -500,23 +569,35 @@ export default function App() {
                   </div>
 
                   <div className="space-y-3 pt-2">
-                    <label className="flex items-center gap-3 p-4 bg-white/80 border border-slate-200/80 hover:border-indigo-300 hover:bg-indigo-50/50 rounded-xl cursor-pointer transition-all shadow-sm group">
+                    <label 
+                      className={`flex items-center gap-3 p-4 bg-white/80 border ${isDraggingSyllabus ? 'border-indigo-500 bg-indigo-50 shadow-md ring-2 ring-indigo-200' : 'border-slate-200/80 hover:border-indigo-300 hover:bg-indigo-50/50'} rounded-xl cursor-pointer transition-all shadow-sm group relative overflow-hidden`}
+                      onDragOver={(e) => handleDragOver(e, setIsDraggingSyllabus)}
+                      onDragLeave={(e) => handleDragLeave(e, setIsDraggingSyllabus)}
+                      onDrop={handleDropSyllabus}
+                    >
+                      {isDraggingSyllabus && <div className="absolute inset-0 bg-indigo-500/5 backdrop-blur-[1px] pointer-events-none z-10"></div>}
                       <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
                         <FileUp size={18} className="text-indigo-600" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-slate-700 truncate">上傳課本內容 (可複選)</p>
+                        <p className="text-sm font-semibold text-slate-700 truncate">上傳課本內容 (可點擊或拖曳)</p>
                         <p className="text-xs text-slate-400 truncate">{syllabusFiles.length > 0 ? `已選取 ${syllabusFiles.length} 個檔案` : '選填：供 AI 分類單元與課綱'}</p>
                       </div>
                       <input type="file" className="hidden" multiple accept=".pdf,.docx,.jpg,.png" onChange={e => setSyllabusFiles(Array.from(e.target.files))} />
                     </label>
 
-                    <label className="flex items-center gap-3 p-4 bg-white/80 border border-slate-200/80 hover:border-blue-300 hover:bg-blue-50/50 rounded-xl cursor-pointer transition-all shadow-sm group">
+                    <label 
+                      className={`flex items-center gap-3 p-4 bg-white/80 border ${isDraggingTestPaper ? 'border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200' : 'border-slate-200/80 hover:border-blue-300 hover:bg-blue-50/50'} rounded-xl cursor-pointer transition-all shadow-sm group relative overflow-hidden`}
+                      onDragOver={(e) => handleDragOver(e, setIsDraggingTestPaper)}
+                      onDragLeave={(e) => handleDragLeave(e, setIsDraggingTestPaper)}
+                      onDrop={handleDropTestPaper}
+                    >
+                      {isDraggingTestPaper && <div className="absolute inset-0 bg-blue-500/5 backdrop-blur-[1px] pointer-events-none z-10"></div>}
                       <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
                         <Upload size={18} className="text-blue-600" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-slate-700 truncate">上傳測驗考卷</p>
+                        <p className="text-sm font-semibold text-slate-700 truncate">上傳測驗考卷 (可點擊或拖曳)</p>
                         <p className="text-xs text-slate-400 truncate">{testPaperFile ? testPaperFile.name : '準備交給 AI 分析'}</p>
                       </div>
                       <input type="file" className="hidden" accept=".pdf,.docx,.jpg,.png" onChange={e => setTestPaperFile(e.target.files[0])} />
@@ -530,7 +611,7 @@ export default function App() {
                     disabled={isAnalyzing || !testPaperFile}
                     className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:hover:translate-y-0 flex items-center justify-center gap-2"
                   >
-                    {isAnalyzing ? <><Loader2 size={18} className="animate-spin" /> 正在深度分析中...</> : '開始 AI 自動分析'}
+                    {isAnalyzing ? <><Loader2 size={18} className="animate-spin" /> {loadingText}</> : '開始 AI 自動分析'}
                   </button>
                   
                   <button 
