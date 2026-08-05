@@ -1,3 +1,4 @@
+// 網站建立自楊家驊老師 The website was created by Teacher ChiahuaYang
 import React, { useState } from 'react';
 import { Upload, FileText, Download, Plus, Trash2, Settings, Table as TableIcon, Sparkles, Key, AlertCircle, Loader2, LayoutGrid, CheckCircle2, FileUp, ExternalLink, Info, X } from 'lucide-react';
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, VerticalAlign } from 'docx';
