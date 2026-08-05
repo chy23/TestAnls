@@ -439,6 +439,16 @@ export default function App() {
         </div>
       </header>
 
+      {/* Top Right Watermark */}
+      <div className="fixed top-32 right-6 text-[18pt] text-slate-500/25 font-bold pointer-events-none select-none z-40">
+        網站建立自楊家驊老師
+      </div>
+
+      {/* Bottom Right Watermark */}
+      <div className="fixed bottom-6 right-6 text-[18pt] text-slate-500/25 font-bold pointer-events-none select-none z-40">
+        網站建立自楊家驊老師
+      </div>
+
       <main className="max-w-7xl mx-auto px-6 py-10 space-y-8 relative z-10">
         
         {error && (
