@@ -109,6 +109,16 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isAnalyzing]);
 
+  useEffect(() => {
+    const preventDefault = (e) => e.preventDefault();
+    window.addEventListener('dragover', preventDefault);
+    window.addEventListener('drop', preventDefault);
+    return () => {
+      window.removeEventListener('dragover', preventDefault);
+      window.removeEventListener('drop', preventDefault);
+    };
+  }, []);
+
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
 
@@ -587,10 +597,10 @@ export default function App() {
                       onDrop={handleDropSyllabus}
                     >
                       {isDraggingSyllabus && <div className="absolute inset-0 bg-indigo-500/5 backdrop-blur-[1px] pointer-events-none z-10"></div>}
-                      <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
+                      <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors pointer-events-none">
                         <FileUp size={18} className="text-indigo-600" />
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 pointer-events-none">
                         <p className="text-sm font-semibold text-slate-700 truncate">上傳課本內容 (可點擊或拖曳)</p>
                         <p className="text-xs text-slate-400 truncate">{syllabusFiles.length > 0 ? `已選取 ${syllabusFiles.length} 個檔案` : '選填：供 AI 分類單元與課綱'}</p>
                       </div>
@@ -605,10 +615,10 @@ export default function App() {
                       onDrop={handleDropTestPaper}
                     >
                       {isDraggingTestPaper && <div className="absolute inset-0 bg-blue-500/5 backdrop-blur-[1px] pointer-events-none z-10"></div>}
-                      <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                      <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors pointer-events-none">
                         <Upload size={18} className="text-blue-600" />
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 pointer-events-none">
                         <p className="text-sm font-semibold text-slate-700 truncate">上傳測驗考卷 (可點擊或拖曳)</p>
                         <p className="text-xs text-slate-400 truncate">{testPaperFile ? testPaperFile.name : '準備交給 AI 分析'}</p>
                       </div>
