@@ -117,18 +117,27 @@ export default function App() {
     setShowApiHelp(false);
   };
 
+  const handleDragEnter = (e, setDragging) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragging(true);
+  };
+
   const handleDragOver = (e, setDragging) => {
     e.preventDefault();
+    e.stopPropagation();
     setDragging(true);
   };
 
   const handleDragLeave = (e, setDragging) => {
     e.preventDefault();
+    e.stopPropagation();
     setDragging(false);
   };
 
   const handleDropSyllabus = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDraggingSyllabus(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       setSyllabusFiles(Array.from(e.dataTransfer.files));
@@ -137,6 +146,7 @@ export default function App() {
 
   const handleDropTestPaper = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDraggingTestPaper(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       setTestPaperFile(e.dataTransfer.files[0]);
@@ -571,6 +581,7 @@ export default function App() {
                   <div className="space-y-3 pt-2">
                     <label 
                       className={`flex items-center gap-3 p-4 bg-white/80 border ${isDraggingSyllabus ? 'border-indigo-500 bg-indigo-50 shadow-md ring-2 ring-indigo-200' : 'border-slate-200/80 hover:border-indigo-300 hover:bg-indigo-50/50'} rounded-xl cursor-pointer transition-all shadow-sm group relative overflow-hidden`}
+                      onDragEnter={(e) => handleDragEnter(e, setIsDraggingSyllabus)}
                       onDragOver={(e) => handleDragOver(e, setIsDraggingSyllabus)}
                       onDragLeave={(e) => handleDragLeave(e, setIsDraggingSyllabus)}
                       onDrop={handleDropSyllabus}
@@ -588,6 +599,7 @@ export default function App() {
 
                     <label 
                       className={`flex items-center gap-3 p-4 bg-white/80 border ${isDraggingTestPaper ? 'border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200' : 'border-slate-200/80 hover:border-blue-300 hover:bg-blue-50/50'} rounded-xl cursor-pointer transition-all shadow-sm group relative overflow-hidden`}
+                      onDragEnter={(e) => handleDragEnter(e, setIsDraggingTestPaper)}
                       onDragOver={(e) => handleDragOver(e, setIsDraggingTestPaper)}
                       onDragLeave={(e) => handleDragLeave(e, setIsDraggingTestPaper)}
                       onDrop={handleDropTestPaper}
