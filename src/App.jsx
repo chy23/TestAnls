@@ -110,7 +110,11 @@ export default function App() {
   }, [isAnalyzing]);
 
   useEffect(() => {
-    const preventDefault = (e) => e.preventDefault();
+    const preventDefault = (e) => {
+      if (e.target.type !== 'file') {
+        e.preventDefault();
+      }
+    };
     window.addEventListener('dragover', preventDefault);
     window.addEventListener('drop', preventDefault);
     return () => {
@@ -125,42 +129,6 @@ export default function App() {
   const handleApiKeyChange = (e) => {
     setApiKey(e.target.value);
     setShowApiHelp(false);
-  };
-
-  const handleDragEnter = (e, setDragging) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragging(true);
-  };
-
-  const handleDragOver = (e, setDragging) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragging(true);
-  };
-
-  const handleDragLeave = (e, setDragging) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragging(false);
-  };
-
-  const handleDropSyllabus = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDraggingSyllabus(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      setSyllabusFiles(Array.from(e.dataTransfer.files));
-    }
-  };
-
-  const handleDropTestPaper = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDraggingTestPaper(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      setTestPaperFile(e.dataTransfer.files[0]);
-    }
   };
 
   const handleBasicInfoChange = (e) => {
@@ -447,11 +415,37 @@ export default function App() {
       2. 務必讓「學習表現」與「學習內容」只填寫課綱編碼，絕對不要包含任何中文說明文字。
       請只回傳 JSON，不要包含任何 markdown 語法 (不要有 \`\`\`json 等) 或額外的說明文字。`);
 
-      const response = await ai.models.generateContent({ 
-        model: 'gemini-2.5-flash', 
-        contents,
-        config: { responseMimeType: "application/json" }
-      });
+      const MODEL_FALLBACK_CHAIN = [
+        'gemini-3.5-flash',
+        'gemini-3.6-flash',
+        'gemini-3.7-flash',
+        'gemini-3.1-pro-preview',
+      ];
+
+      // 嘗試備援鏈中的每一個模型
+      let response = null;
+      let usedModel = null;
+      let lastError = null;
+
+      for (const modelName of MODEL_FALLBACK_CHAIN) {
+        try {
+          response = await ai.models.generateContent({ 
+            model: modelName, 
+            contents,
+            config: { responseMimeType: "application/json" }
+          });
+          usedModel = modelName;
+          break;
+        } catch (modelErr) {
+          lastError = modelErr;
+          console.warn(`模型 ${modelName} 失敗，嘗試下一個...`, modelErr.message);
+        }
+      }
+
+      if (!response) {
+        throw lastError || new Error("所有備援模型均無法完成分析，請稍後再試。");
+      }
+
       const responseText = response.text;
       
       try {
@@ -490,7 +484,7 @@ export default function App() {
             };
           });
           setTableData(newData);
-          setSuccessMsg("AI 分析成功！試卷基本設定與雙向細目表已自動更新。");
+          setSuccessMsg(`AI 分析成功！（使用模型：${usedModel}）試卷基本設定與雙向細目表已自動更新。`);
         } else {
           setError("AI 分析成功，但無法解析為有效的表格格式，請重試。");
         }
@@ -591,38 +585,36 @@ export default function App() {
                   <div className="space-y-3 pt-2">
                     <label 
                       className={`flex items-center gap-3 p-4 bg-white/80 border ${isDraggingSyllabus ? 'border-indigo-500 bg-indigo-50 shadow-md ring-2 ring-indigo-200' : 'border-slate-200/80 hover:border-indigo-300 hover:bg-indigo-50/50'} rounded-xl cursor-pointer transition-all shadow-sm group relative overflow-hidden`}
-                      onDragEnter={(e) => handleDragEnter(e, setIsDraggingSyllabus)}
-                      onDragOver={(e) => handleDragOver(e, setIsDraggingSyllabus)}
-                      onDragLeave={(e) => handleDragLeave(e, setIsDraggingSyllabus)}
-                      onDrop={handleDropSyllabus}
+                      onDragEnter={() => setIsDraggingSyllabus(true)}
+                      onDragLeave={() => setIsDraggingSyllabus(false)}
+                      onDrop={() => setIsDraggingSyllabus(false)}
                     >
+                      <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50" multiple accept=".pdf,.docx,.jpg,.png" onChange={e => { setSyllabusFiles(Array.from(e.target.files)); setIsDraggingSyllabus(false); }} />
                       {isDraggingSyllabus && <div className="absolute inset-0 bg-indigo-500/5 backdrop-blur-[1px] pointer-events-none z-10"></div>}
-                      <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors pointer-events-none">
+                      <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors pointer-events-none relative z-20">
                         <FileUp size={18} className="text-indigo-600" />
                       </div>
-                      <div className="flex-1 min-w-0 pointer-events-none">
+                      <div className="flex-1 min-w-0 pointer-events-none relative z-20">
                         <p className="text-sm font-semibold text-slate-700 truncate">上傳課本內容 (可點擊或拖曳)</p>
                         <p className="text-xs text-slate-400 truncate">{syllabusFiles.length > 0 ? `已選取 ${syllabusFiles.length} 個檔案` : '選填：供 AI 分類單元與課綱'}</p>
                       </div>
-                      <input type="file" className="hidden" multiple accept=".pdf,.docx,.jpg,.png" onChange={e => setSyllabusFiles(Array.from(e.target.files))} />
                     </label>
 
                     <label 
                       className={`flex items-center gap-3 p-4 bg-white/80 border ${isDraggingTestPaper ? 'border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200' : 'border-slate-200/80 hover:border-blue-300 hover:bg-blue-50/50'} rounded-xl cursor-pointer transition-all shadow-sm group relative overflow-hidden`}
-                      onDragEnter={(e) => handleDragEnter(e, setIsDraggingTestPaper)}
-                      onDragOver={(e) => handleDragOver(e, setIsDraggingTestPaper)}
-                      onDragLeave={(e) => handleDragLeave(e, setIsDraggingTestPaper)}
-                      onDrop={handleDropTestPaper}
+                      onDragEnter={() => setIsDraggingTestPaper(true)}
+                      onDragLeave={() => setIsDraggingTestPaper(false)}
+                      onDrop={() => setIsDraggingTestPaper(false)}
                     >
+                      <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50" accept=".pdf,.docx,.jpg,.png" onChange={e => { setTestPaperFile(e.target.files[0]); setIsDraggingTestPaper(false); }} />
                       {isDraggingTestPaper && <div className="absolute inset-0 bg-blue-500/5 backdrop-blur-[1px] pointer-events-none z-10"></div>}
-                      <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors pointer-events-none">
+                      <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors pointer-events-none relative z-20">
                         <Upload size={18} className="text-blue-600" />
                       </div>
-                      <div className="flex-1 min-w-0 pointer-events-none">
+                      <div className="flex-1 min-w-0 pointer-events-none relative z-20">
                         <p className="text-sm font-semibold text-slate-700 truncate">上傳測驗考卷 (可點擊或拖曳)</p>
                         <p className="text-xs text-slate-400 truncate">{testPaperFile ? testPaperFile.name : '準備交給 AI 分析'}</p>
                       </div>
-                      <input type="file" className="hidden" accept=".pdf,.docx,.jpg,.png" onChange={e => setTestPaperFile(e.target.files[0])} />
                     </label>
                   </div>
                 </div>
