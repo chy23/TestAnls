@@ -1,8 +1,124 @@
 // 網站建立自楊家驊老師 The website was created by Teacher ChiahuaYang
 import React, { useState, useEffect } from 'react';
-import { Upload, FileText, Download, Plus, Trash2, Settings, Table as TableIcon, Sparkles, Key, AlertCircle, Loader2, LayoutGrid, CheckCircle2, FileUp, ExternalLink, Info, X } from 'lucide-react';
+import { Upload, FileText, Download, Plus, Trash2, Settings, Table as TableIcon, Sparkles, Key, AlertCircle, Loader2, LayoutGrid, CheckCircle2, FileUp, ExternalLink, Info, X, History, Tag } from 'lucide-react';
 import { saveAs } from 'file-saver';
 import syllabusData from './data/syllabus.json';
+
+// ─── 版本更新紀錄 ───────────────────────────────────────────
+const CHANGELOG = [
+  {
+    version: 'v2.5.0',
+    date: '2026-08-14',
+    title: '模型備援鏈升級',
+    details: '實作 AI 模型自動備援順序機制，優先使用最新 gemini-3.5-flash，若失敗依序切換至 gemini-3.6-flash、gemini-3.7-flash、gemini-3.1-pro-preview。分析完成後顯示實際使用模型名稱。',
+    bugFixes: [],
+  },
+  {
+    version: 'v2.4.0',
+    date: '2026-08-06',
+    title: '自動部署與拖曳上傳全面修復',
+    details: '建立 GitHub Actions 自動化部署流程（每次 push 自動發布至 GitHub Pages）。將拖曳上傳的實作方式改為全尺寸透明原生 file input 覆蓋，解決所有瀏覽器相容問題。',
+    bugFixes: ['修正拖曳至子元件時 dragLeave 誤觸發導致視覺閃爍的問題', '修正 GitHub Action 第一次跑失敗（npm ci 改為 npm install）'],
+  },
+  {
+    version: 'v2.3.0',
+    date: '2026-08-05',
+    title: 'UX 全面優化與程式碼分割',
+    details: '加入拖曳上傳 (Drag & Drop) 視覺效果；實作 LocalStorage 自動暫存，防止重整資料流失；AI 分析中加入動態輪播文字；使用動態 import() 分割大型套件，網頁初始載入速度大幅提升。',
+    bugFixes: ['強制 AI 以 application/json 格式輸出，杜絕 JSON 解析失敗問題'],
+  },
+  {
+    version: 'v2.2.0',
+    date: '2026-08-05',
+    title: '浮水印與隱藏版權',
+    details: '在網頁右上及右下角加入 18pt、25% 透明度的灰色浮水印「網站建立自楊家驊老師」，定位避免與主要內容重疊。同時於程式碼中加入隱藏版權備註。',
+    bugFixes: [],
+  },
+  {
+    version: 'v2.1.0',
+    date: '2026-07-25',
+    title: 'API Key 申請說明彈出視窗',
+    details: '點擊分析但未填 API Key 時，自動彈出精美對話框，說明申請流程、費用資訊及申請連結，不再以常駐面板形式顯示。',
+    bugFixes: [],
+  },
+  {
+    version: 'v2.0.0',
+    date: '2026-07-25',
+    title: '全介面 UI 重新設計',
+    details: '整體介面大改版：採用玻璃擬態 (Glassmorphism) 視覺風格、漸層背景光暈、卡片陰影效果。版面改為兩欄式佈局，左側為表格區、右側為 AI 設定區，並調整為響應式排版。',
+    bugFixes: ['修正表格欄位被擠壓的版面問題', '修正 Word 匯出時欄寬比例不正確的問題'],
+  },
+  {
+    version: 'v1.9.0',
+    date: '2026-07-25',
+    title: '清除資料按鈕',
+    details: '新增「清除所有資料並重新開始」按鈕，點擊後跳出確認視窗，確認後清空所有上傳檔案、表格資料及 LocalStorage 暫存記錄。',
+    bugFixes: [],
+  },
+  {
+    version: 'v1.8.0',
+    date: '2026-07-25',
+    title: 'AI Prompt 精準化',
+    details: '優化 AI 分析 Prompt：要求題型欄位必須直接提取考卷上的大題標題（如「一、選擇題」），不再自行命名。同時要求同一單元的 unitName 必須完全一致以便合併顯示。',
+    bugFixes: [],
+  },
+  {
+    version: 'v1.7.0',
+    date: '2026-07-25',
+    title: '自訂應用程式圖示',
+    details: '加入自訂的 TestAnls 應用程式 icon，顯示於瀏覽器分頁標籤上。',
+    bugFixes: [],
+  },
+  {
+    version: 'v1.6.0',
+    date: '2026-07-25',
+    title: '單元列合併顯示 (rowSpan)',
+    details: '相同單元名稱的列在 UI 表格中合併顯示（rowSpan），單元名稱、學習表現、學習內容欄位視覺上合而為一，整體更清晰易讀。',
+    bugFixes: [],
+  },
+  {
+    version: 'v1.5.0',
+    date: '2026-07-25',
+    title: '內建 108 課綱資料庫',
+    details: '整合內建課綱 JSON 資料（國語、數學、社會、自然），AI 分析時自動比對課綱編碼，無需上傳外部課綱資料也能精準對應學習表現與學習內容。',
+    bugFixes: [],
+  },
+  {
+    version: 'v1.4.0',
+    date: '2026-07-25',
+    title: 'Word 匯出與 AI 自動填表',
+    details: '新增匯出精美 Word 功能（.docx 格式），包含雙向細目表完整格式與備註說明。AI 分析後自動填入試卷學年、學期、年級、科目等基本資訊。支援同時上傳多份課本參考檔案。',
+    bugFixes: [],
+  },
+  {
+    version: 'v1.3.0',
+    date: '2026-07-25',
+    title: '課本檔案上傳支援',
+    details: '新增課本/參考資料上傳區，支援 PDF、DOCX、圖片格式。AI 可根據課本內容自動推導各單元名稱及對應的 108 課綱學習表現與學習內容編碼。',
+    bugFixes: [],
+  },
+  {
+    version: 'v1.2.0',
+    date: '2026-07-25',
+    title: 'GitHub Pages 初次部署',
+    details: '設定 Vite base path，成功將網站部署至 GitHub Pages (https://chy23.github.io/TestAnls)，支援公開網路存取。',
+    bugFixes: ['修正 base path 設定錯誤導致資源 404 的問題'],
+  },
+  {
+    version: 'v1.1.0',
+    date: '2026-07-24',
+    title: 'Google Gemini AI 整合',
+    details: '整合 Google Gemini AI 分析功能，使用者可輸入 API Key 後上傳考卷，AI 自動分析並填入雙向細目表。支援 PDF 與圖片格式的考卷辨識。',
+    bugFixes: [],
+  },
+  {
+    version: 'v1.0.0',
+    date: '2026-07-24',
+    title: '初始建立',
+    details: '建立 TestAnls 雙向細目表分析系統的基礎架構。包含試卷基本資料填寫區（學年、學期、年級、科目、範圍、時間、命題者、審題者）及可手動編輯的雙向細目表（單元、學習表現、學習內容、題型、知識/應用/評鑑題數與分數）。',
+    bugFixes: [],
+  },
+];
 
 export default function App() {
   const [apiKey, setApiKey] = useState('');
@@ -57,6 +173,7 @@ export default function App() {
   const [syllabusFiles, setSyllabusFiles] = useState([]);
   const [testPaperFile, setTestPaperFile] = useState(null);
   const [showApiHelp, setShowApiHelp] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
   const [isDraggingSyllabus, setIsDraggingSyllabus] = useState(false);
   const [isDraggingTestPaper, setIsDraggingTestPaper] = useState(false);
 
@@ -516,12 +633,80 @@ export default function App() {
               <p className="text-xs font-medium text-slate-500 tracking-wider uppercase">Intelligent Exam Analysis</p>
             </div>
           </div>
-          <button onClick={exportToWord} className="flex items-center gap-2.5 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl transition-all font-semibold text-sm shadow-xl shadow-blue-600/20 hover:-translate-y-0.5 active:translate-y-0">
-            <FileText size={18} />
-            匯出精美 Word
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={() => setShowChangelog(true)} className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-800 border border-slate-200 px-4 py-2.5 rounded-xl transition-all font-semibold text-sm shadow-sm hover:-translate-y-0.5 active:translate-y-0">
+              <History size={16} />
+              更新紀錄
+              <span className="ml-0.5 text-xs bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full font-bold">{CHANGELOG[0].version}</span>
+            </button>
+            <button onClick={exportToWord} className="flex items-center gap-2.5 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl transition-all font-semibold text-sm shadow-xl shadow-blue-600/20 hover:-translate-y-0.5 active:translate-y-0">
+              <FileText size={18} />
+              匯出精美 Word
+            </button>
+          </div>
         </div>
       </header>
+
+      {/* Changelog Modal */}
+      {showChangelog && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setShowChangelog(false)}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-blue-50">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center">
+                  <History size={18} className="text-indigo-600" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-800">版本更新紀錄</h2>
+                  <p className="text-xs text-slate-500">TestAnls · Intelligent Exam Analysis</p>
+                </div>
+              </div>
+              <button onClick={() => setShowChangelog(false)} className="w-8 h-8 rounded-lg hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="overflow-y-auto flex-1 p-6 space-y-5">
+              {CHANGELOG.map((entry, idx) => (
+                <div key={entry.version} className={`relative pl-5 border-l-2 ${idx === 0 ? 'border-indigo-400' : 'border-slate-200'}`}>
+                  <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                    <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full ${idx === 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
+                      <Tag size={10} />
+                      {entry.version}
+                    </span>
+                    <span className="text-sm font-bold text-slate-800">{entry.title}</span>
+                    {idx === 0 && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">最新版本</span>}
+                    <span className="text-xs text-slate-400 ml-auto">{entry.date}</span>
+                  </div>
+                  <p className="text-sm text-slate-600 leading-relaxed">{entry.details}</p>
+                  {entry.bugFixes.length > 0 && (
+                    <ul className="mt-2 space-y-1">
+                      {entry.bugFixes.map((fix, i) => (
+                        <li key={i} className="flex items-start gap-1.5 text-xs text-red-600">
+                          <span className="mt-0.5 shrink-0">🐛</span>
+                          <span>{fix}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+              <p className="text-xs text-slate-400">共 {CHANGELOG.length} 個版本紀錄</p>
+              <button onClick={() => setShowChangelog(false)} className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 transition-colors">
+                關閉
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Top Right Watermark */}
       <div className="fixed top-32 right-6 text-[18pt] text-slate-500/25 font-bold pointer-events-none select-none z-40">
