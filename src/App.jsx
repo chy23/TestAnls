@@ -1,11 +1,18 @@
 // 網站建立自楊家驊老師 The website was created by Teacher ChiahuaYang
 import React, { useState, useEffect } from 'react';
-import { Upload, FileText, Download, Plus, Trash2, Settings, Table as TableIcon, Sparkles, Key, AlertCircle, Loader2, LayoutGrid, CheckCircle2, FileUp, ExternalLink, Info, X, History, Tag } from 'lucide-react';
+import { Upload, FileText, Download, Plus, Trash2, Settings, Table as TableIcon, Sparkles, Key, AlertCircle, Loader2, LayoutGrid, CheckCircle2, FileUp, ExternalLink, Info, X, History, Tag, Eye, EyeOff } from 'lucide-react';
 import { saveAs } from 'file-saver';
 import syllabusData from './data/syllabus.json';
 
 // ─── 版本更新紀錄 ───────────────────────────────────────────
 const CHANGELOG = [
+  {
+    version: 'v2.6.0',
+    date: '2026-08-15',
+    title: 'UI/UX 全面升級（10 項優化）',
+    details: '① 自訂精美確認對話框取代瀏覽器原生彈窗；② 錯誤/成功訊息 4 秒後自動消失並可手動關閉；③ API Key 新增眼睛圖示可切換明文/密文顯示；④ 刪除列按鈕改為常駐淡色顯示；⑤ 表格欄位加寬改善資訊顯示；⑥ 上傳區塊新增移除已選檔案功能；⑦ 手機版 Header 響應式優化；⑧ 表格加入空狀態引導說明；⑨ 分析按鈕 disabled 時顯示 tooltip 提示；⑩ 底部統計列在各裝置下版面修正。',
+    bugFixes: [],
+  },
   {
     version: 'v2.5.0',
     date: '2026-08-14',
@@ -174,43 +181,23 @@ export default function App() {
   const [testPaperFile, setTestPaperFile] = useState(null);
   const [showApiHelp, setShowApiHelp] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [showConfirmReset, setShowConfirmReset] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
   const [isDraggingSyllabus, setIsDraggingSyllabus] = useState(false);
   const [isDraggingTestPaper, setIsDraggingTestPaper] = useState(false);
 
-  const handleReset = () => {
-    if (window.confirm("確定要清除所有上傳檔案與表格資料嗎？")) {
-      localStorage.removeItem('testAnls_basicInfo');
-      localStorage.removeItem('testAnls_tableData');
-      setSyllabusFiles([]);
-      setTestPaperFile(null);
-      setTableData([
-        {
-          id: Date.now(),
-          unitName: '',
-          learningPerformance: '',
-          learningContent: '',
-          questionType: '選擇題',
-          cognitiveScores: {
-            knowledge: { count: 0, score: 0 },
-            application: { count: 0, score: 0 },
-            evaluation: { count: 0, score: 0 }
-          }
-        }
-      ]);
-      setBasicInfo({
-        academicYear: '112',
-        semester: '上',
-        grade: '三',
-        subject: '數學',
-        scope: '第一單元至第五單元',
-        time: '40分鐘',
-        setter: '王大明老師',
-        reviewer: '李小華老師'
-      });
-      setError(null);
-      setSuccessMsg("資料已全數清除，可以重新開始分析了！");
-    }
+  const doReset = () => {
+    localStorage.removeItem('testAnls_basicInfo');
+    localStorage.removeItem('testAnls_tableData');
+    setSyllabusFiles([]);
+    setTestPaperFile(null);
+    setTableData([{ id: Date.now(), unitName: '', learningPerformance: '', learningContent: '', questionType: '選擇題', cognitiveScores: { knowledge: { count: 0, score: 0 }, application: { count: 0, score: 0 }, evaluation: { count: 0, score: 0 } } }]);
+    setBasicInfo({ academicYear: '', semester: '', grade: '', subject: '', scope: '', time: '40 分鐘', setter: '', reviewer: '' });
+    setError(null);
+    setSuccessMsg('資料已全數清除，可以重新開始分析了！');
+    setShowConfirmReset(false);
   };
+
 
   useEffect(() => {
     let interval;
@@ -242,6 +229,9 @@ export default function App() {
 
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
+
+  useEffect(() => { if (!error) return; const t = setTimeout(() => setError(null), 4000); return () => clearTimeout(t); }, [error]);
+  useEffect(() => { if (!successMsg) return; const t = setTimeout(() => setSuccessMsg(null), 4000); return () => clearTimeout(t); }, [successMsg]);
 
   const handleApiKeyChange = (e) => {
     setApiKey(e.target.value);
@@ -723,13 +713,15 @@ export default function App() {
         {error && (
           <div className="bg-red-50/80 backdrop-blur-md border border-red-200 text-red-700 p-4 rounded-2xl flex items-start gap-3 shadow-lg shadow-red-500/5 animate-in slide-in-from-top-4">
             <AlertCircle className="shrink-0 mt-0.5 text-red-500" size={20} />
-            <p className="text-sm font-medium">{error}</p>
+            <p className="text-sm font-medium flex-1">{error}</p>
+            <button onClick={() => setError(null)} className="shrink-0 text-red-400 hover:text-red-600 transition-colors"><X size={16} /></button>
           </div>
         )}
         {successMsg && (
           <div className="bg-emerald-50/80 backdrop-blur-md border border-emerald-200 text-emerald-800 p-4 rounded-2xl flex items-start gap-3 shadow-lg shadow-emerald-500/5 animate-in slide-in-from-top-4">
             <CheckCircle2 className="shrink-0 mt-0.5 text-emerald-500" size={20} />
-            <p className="text-sm font-medium">{successMsg}</p>
+            <p className="text-sm font-medium flex-1">{successMsg}</p>
+            <button onClick={() => setSuccessMsg(null)} className="shrink-0 text-emerald-500 hover:text-emerald-700 transition-colors"><X size={16} /></button>
           </div>
         )}
 
@@ -752,69 +744,100 @@ export default function App() {
                 
                 <div className="space-y-5 flex-1">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-1 flex justify-between items-center">
-                      <span>API Key (不記錄於本地體)</span>
-                    </label>
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-1">API Key (不記錄於本地端)</label>
                     <div className="relative">
                       <Key size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input 
-                        type="password" 
+                        type={showApiKey ? 'text' : 'password'} 
                         value={apiKey} 
                         onChange={handleApiKeyChange} 
-                        className="w-full pl-10 pr-4 py-3 bg-white/80 border border-slate-200/80 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-mono placeholder:font-sans shadow-sm" 
+                        className="w-full pl-10 pr-10 py-3 bg-white/80 border border-slate-200/80 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-mono placeholder:font-sans shadow-sm" 
                         placeholder="請貼上您的 Google Gemini API Key..." 
                       />
+                      <button type="button" onClick={() => setShowApiKey(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+                        {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
                     </div>
                   </div>
 
                   <div className="space-y-3 pt-2">
-                    <label 
-                      className={`flex items-center gap-3 p-4 bg-white/80 border ${isDraggingSyllabus ? 'border-indigo-500 bg-indigo-50 shadow-md ring-2 ring-indigo-200' : 'border-slate-200/80 hover:border-indigo-300 hover:bg-indigo-50/50'} rounded-xl cursor-pointer transition-all shadow-sm group relative overflow-hidden`}
-                      onDragEnter={() => setIsDraggingSyllabus(true)}
-                      onDragLeave={() => setIsDraggingSyllabus(false)}
-                      onDrop={() => setIsDraggingSyllabus(false)}
-                    >
-                      <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50" multiple accept=".pdf,.docx,.jpg,.png" onChange={e => { setSyllabusFiles(Array.from(e.target.files)); setIsDraggingSyllabus(false); }} />
-                      {isDraggingSyllabus && <div className="absolute inset-0 bg-indigo-500/5 backdrop-blur-[1px] pointer-events-none z-10"></div>}
-                      <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors pointer-events-none relative z-20">
-                        <FileUp size={18} className="text-indigo-600" />
-                      </div>
-                      <div className="flex-1 min-w-0 pointer-events-none relative z-20">
-                        <p className="text-sm font-semibold text-slate-700 truncate">上傳課本內容 (可點擊或拖曳)</p>
-                        <p className="text-xs text-slate-400 truncate">{syllabusFiles.length > 0 ? `已選取 ${syllabusFiles.length} 個檔案` : '選填：供 AI 分類單元與課綱'}</p>
-                      </div>
-                    </label>
+                    <div>
+                      <label 
+                        className={`flex items-center gap-3 p-4 bg-white/80 border ${isDraggingSyllabus ? 'border-indigo-500 bg-indigo-50 shadow-md ring-2 ring-indigo-200' : 'border-slate-200/80 hover:border-indigo-300 hover:bg-indigo-50/50'} rounded-xl cursor-pointer transition-all shadow-sm group relative overflow-hidden`}
+                        onDragEnter={() => setIsDraggingSyllabus(true)}
+                        onDragLeave={() => setIsDraggingSyllabus(false)}
+                        onDrop={() => setIsDraggingSyllabus(false)}
+                      >
+                        <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50" multiple accept=".pdf,.docx,.jpg,.png" onChange={e => { setSyllabusFiles(Array.from(e.target.files)); setIsDraggingSyllabus(false); }} />
+                        {isDraggingSyllabus && <div className="absolute inset-0 bg-indigo-500/5 backdrop-blur-[1px] pointer-events-none z-10"></div>}
+                        <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors pointer-events-none relative z-20">
+                          <FileUp size={18} className="text-indigo-600" />
+                        </div>
+                        <div className="flex-1 min-w-0 pointer-events-none relative z-20">
+                          <p className="text-sm font-semibold text-slate-700 truncate">上傳課本內容 (可點擊或拖曳)</p>
+                          <p className="text-xs text-slate-400 truncate">{syllabusFiles.length > 0 ? `已選取 ${syllabusFiles.length} 個檔案` : '選填：供 AI 分類單元與課綱'}</p>
+                        </div>
+                      </label>
+                      {syllabusFiles.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5 pl-1">
+                          {syllabusFiles.map((f, i) => (
+                            <span key={i} className="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full max-w-[160px]">
+                              <span className="truncate">{f.name}</span>
+                              <button type="button" onClick={() => setSyllabusFiles(prev => prev.filter((_, idx) => idx !== i))} className="shrink-0 hover:text-red-500 transition-colors ml-0.5"><X size={10} /></button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
 
-                    <label 
-                      className={`flex items-center gap-3 p-4 bg-white/80 border ${isDraggingTestPaper ? 'border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200' : 'border-slate-200/80 hover:border-blue-300 hover:bg-blue-50/50'} rounded-xl cursor-pointer transition-all shadow-sm group relative overflow-hidden`}
-                      onDragEnter={() => setIsDraggingTestPaper(true)}
-                      onDragLeave={() => setIsDraggingTestPaper(false)}
-                      onDrop={() => setIsDraggingTestPaper(false)}
-                    >
-                      <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50" accept=".pdf,.docx,.jpg,.png" onChange={e => { setTestPaperFile(e.target.files[0]); setIsDraggingTestPaper(false); }} />
-                      {isDraggingTestPaper && <div className="absolute inset-0 bg-blue-500/5 backdrop-blur-[1px] pointer-events-none z-10"></div>}
-                      <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors pointer-events-none relative z-20">
-                        <Upload size={18} className="text-blue-600" />
-                      </div>
-                      <div className="flex-1 min-w-0 pointer-events-none relative z-20">
-                        <p className="text-sm font-semibold text-slate-700 truncate">上傳測驗考卷 (可點擊或拖曳)</p>
-                        <p className="text-xs text-slate-400 truncate">{testPaperFile ? testPaperFile.name : '準備交給 AI 分析'}</p>
-                      </div>
-                    </label>
+                    <div>
+                      <label 
+                        className={`flex items-center gap-3 p-4 bg-white/80 border ${isDraggingTestPaper ? 'border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200' : 'border-slate-200/80 hover:border-blue-300 hover:bg-blue-50/50'} rounded-xl cursor-pointer transition-all shadow-sm group relative overflow-hidden`}
+                        onDragEnter={() => setIsDraggingTestPaper(true)}
+                        onDragLeave={() => setIsDraggingTestPaper(false)}
+                        onDrop={() => setIsDraggingTestPaper(false)}
+                      >
+                        <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-50" accept=".pdf,.docx,.jpg,.png" onChange={e => { setTestPaperFile(e.target.files[0]); setIsDraggingTestPaper(false); }} />
+                        {isDraggingTestPaper && <div className="absolute inset-0 bg-blue-500/5 backdrop-blur-[1px] pointer-events-none z-10"></div>}
+                        <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors pointer-events-none relative z-20">
+                          <Upload size={18} className="text-blue-600" />
+                        </div>
+                        <div className="flex-1 min-w-0 pointer-events-none relative z-20">
+                          <p className="text-sm font-semibold text-slate-700 truncate">上傳測驗考卷 (可點擊或拖曳)</p>
+                          <p className="text-xs text-slate-400 truncate">{testPaperFile ? testPaperFile.name : '準備交給 AI 分析'}</p>
+                        </div>
+                      </label>
+                      {testPaperFile && (
+                        <div className="mt-2 pl-1">
+                          <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full max-w-full">
+                            <span className="truncate">{testPaperFile.name}</span>
+                            <button type="button" onClick={() => setTestPaperFile(null)} className="shrink-0 hover:text-red-500 transition-colors ml-0.5"><X size={10} /></button>
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 <div className="mt-6 flex flex-col gap-3">
-                  <button 
-                    onClick={handleAIAnalysis}
-                    disabled={isAnalyzing || !testPaperFile}
-                    className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:hover:translate-y-0 flex items-center justify-center gap-2"
-                  >
-                    {isAnalyzing ? <><Loader2 size={18} className="animate-spin" /> {loadingText}</> : '開始 AI 自動分析'}
-                  </button>
+                  <div className="relative group/analyze">
+                    <button 
+                      onClick={handleAIAnalysis}
+                      disabled={isAnalyzing || !testPaperFile}
+                      className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold rounded-xl shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50 disabled:hover:translate-y-0 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isAnalyzing ? <><Loader2 size={18} className="animate-spin" /> {loadingText}</> : '開始 AI 自動分析'}
+                    </button>
+                    {!testPaperFile && !isAnalyzing && (
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-slate-800 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover/analyze:opacity-100 transition-opacity pointer-events-none shadow-lg z-50">
+                        請先上傳測驗考卷才能分析
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
+                      </div>
+                    )}
+                  </div>
                   
                   <button 
-                    onClick={handleReset}
+                    onClick={() => setShowConfirmReset(true)}
                     className="w-full py-3 bg-white border border-rose-200 text-rose-600 font-bold rounded-xl shadow-sm hover:bg-rose-50 hover:border-rose-300 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2"
                   >
                     <Trash2 size={18} />
@@ -961,13 +984,21 @@ export default function App() {
                           </td>
 
                           <td className="p-2 text-center">
-                             <button onClick={() => removeRow(row.id)} className="text-slate-300 hover:text-red-500 bg-transparent hover:bg-red-50 p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 mx-auto block">
+                             <button onClick={() => removeRow(row.id)} className="text-slate-300 hover:text-red-500 bg-transparent hover:bg-red-50 p-2 rounded-lg transition-all mx-auto block">
                                 <Trash2 size={16} />
                              </button>
                           </td>
                         </tr>
                         );
-                      })}
+                      })}{tableData.length === 1 && !tableData[0].unitName && !tableData[0].questionType && (
+                        <tr><td colSpan={11} className="py-12 text-center">
+                          <div className="flex flex-col items-center gap-3 text-slate-400">
+                            <TableIcon size={36} className="opacity-30" />
+                            <p className="text-sm font-semibold">表格目前是空的</p>
+                            <p className="text-xs">請上傳考卷後點擊「開始 AI 自動分析」，或點擊右上角「新增列」手動填寫</p>
+                          </div>
+                        </td></tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1048,6 +1079,27 @@ export default function App() {
             <button onClick={() => setShowApiHelp(false)} className="w-full py-3.5 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold rounded-xl transition-all tracking-wide">
               我知道了
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Reset Modal */}
+      {showConfirmReset && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowConfirmReset(false)}>
+          <div className="bg-white rounded-[2rem] shadow-2xl max-w-sm w-full p-8 flex flex-col items-center text-center animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mb-5">
+              <Trash2 size={30} strokeWidth={2} />
+            </div>
+            <h3 className="text-xl font-black text-slate-800 mb-2 tracking-tight">確定要清除所有資料？</h3>
+            <p className="text-sm text-slate-500 leading-relaxed mb-8">所有上傳的檔案、表格內容與基本設定都將被清除，此操作無法復原。</p>
+            <div className="w-full flex flex-col gap-3">
+              <button onClick={doReset} className="w-full py-3.5 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-xl transition-all shadow-md shadow-rose-500/20 tracking-wide">
+                確定清除
+              </button>
+              <button onClick={() => setShowConfirmReset(false)} className="w-full py-3.5 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold rounded-xl transition-all tracking-wide">
+                取消
+              </button>
+            </div>
           </div>
         </div>
       )}
