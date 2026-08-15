@@ -7,17 +7,24 @@ import syllabusData from './data/syllabus.json';
 // ─── 版本更新紀錄 ───────────────────────────────────────────
 const CHANGELOG = [
   {
+    version: 'v2.6.1',
+    date: '2026-08-15',
+    title: '模型使用順序調整',
+    details: '根據需求，將 AI 模型的備援使用順序調整為：1. gemini-3.7-flash 2. gemini-3.6-flash 3. gemini-3.5-flash 4. gemini-3.1-pro-preview',
+    bugFixes: [],
+  },
+  {
     version: 'v2.6.0',
     date: '2026-08-15',
     title: 'UI/UX 全面升級（10 項優化）',
-    details: '① 自訂精美確認對話框取代瀏覽器原生彈窗；② 錯誤/成功訊息 4 秒後自動消失並可手動關閉；③ API Key 新增眼睛圖示可切換明文/密文顯示；④ 刪除列按鈕改為常駐淡色顯示；⑤ 表格欄位加寬改善資訊顯示；⑥ 上傳區塊新增移除已選檔案功能；⑦ 手機版 Header 響應式優化；⑧ 表格加入空狀態引導說明；⑨ 分析按鈕 disabled 時顯示 tooltip 提示；⑩ 底部統計列在各裝置下版面修正。',
-    bugFixes: [],
+    details: '① 自訂精美確認對話框取代瀏覽器原生彈窗；② 錯誤/成功訊息 4 秒後自動消失並可手動關閉；③ API Key 新增眼睛圖示可切換明文/密文顯示；④ 刪除列按鈕改為常駐淡色顯示；⑤ 表格欄位加寬改善資訊顯示；⑥ 上傳區塊新增移除已選檔案功能；⑦ 手機版 Header 響應式優化；⑧ 表格加入空狀態引導說明；⑨ 分析按鈕 disabled 時顯示 tooltip 提示；⑩ 底部統計列在各裝置下版面修正。修復了因舊版 localStorage 缺漏造成的致命白屏錯誤，並調整 Hooks 順序。',
+    bugFixes: ['修復畫面空白致命錯誤 (localStorage 格式相容性)', '修復開發環境 HMR 重新載入時 React Hooks 順序崩潰問題'],
   },
   {
     version: 'v2.5.0',
     date: '2026-08-14',
     title: '模型備援鏈升級',
-    details: '實作 AI 模型自動備援順序機制，優先使用最新 gemini-3.5-flash，若失敗依序切換至 gemini-3.6-flash、gemini-3.7-flash、gemini-3.1-pro-preview。分析完成後顯示實際使用模型名稱。',
+    details: '實作 AI 模型自動備援順序機制。分析完成後顯示實際使用模型名稱。',
     bugFixes: [],
   },
   {
@@ -532,9 +539,9 @@ export default function App() {
       請只回傳 JSON，不要包含任何 markdown 語法 (不要有 \`\`\`json 等) 或額外的說明文字。`);
 
       const MODEL_FALLBACK_CHAIN = [
-        'gemini-3.5-flash',
-        'gemini-3.6-flash',
         'gemini-3.7-flash',
+        'gemini-3.6-flash',
+        'gemini-3.5-flash',
         'gemini-3.1-pro-preview',
       ];
 
