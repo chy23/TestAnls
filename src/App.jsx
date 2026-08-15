@@ -147,24 +147,36 @@ export default function App() {
   });
 
   const [tableData, setTableData] = useState(() => {
+    const defaultRow = { 
+      id: Date.now(), 
+      unitName: '', 
+      learningPerformance: '', 
+      learningContent: '', 
+      questionType: '選擇題', 
+      cognitiveScores: { 
+        knowledge: { count: 0, score: 0 }, 
+        application: { count: 0, score: 0 }, 
+        evaluation: { count: 0, score: 0 } 
+      } 
+    };
     const saved = localStorage.getItem('testAnls_tableData');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { console.error(e); }
-    }
-    return [
-      {
-        id: 1,
-        unitName: '',
-        learningPerformance: '',
-        learningContent: '',
-        questionType: '選擇題',
-        cognitiveScores: {
-          knowledge: { count: 0, score: 0 },
-          application: { count: 0, score: 0 },
-          evaluation: { count: 0, score: 0 }
+      try { 
+        const parsed = JSON.parse(saved); 
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(row => ({
+            ...defaultRow,
+            ...row,
+            cognitiveScores: {
+              knowledge: { ...defaultRow.cognitiveScores.knowledge, ...(row.cognitiveScores?.knowledge || {}) },
+              application: { ...defaultRow.cognitiveScores.application, ...(row.cognitiveScores?.application || {}) },
+              evaluation: { ...defaultRow.cognitiveScores.evaluation, ...(row.cognitiveScores?.evaluation || {}) }
+            }
+          }));
         }
-      }
-    ];
+      } catch (e) { console.error(e); }
+    }
+    return [ { ...defaultRow } ];
   });
 
   useEffect(() => {
@@ -229,9 +241,6 @@ export default function App() {
 
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
-
-  useEffect(() => { if (!error) return; const t = setTimeout(() => setError(null), 4000); return () => clearTimeout(t); }, [error]);
-  useEffect(() => { if (!successMsg) return; const t = setTimeout(() => setSuccessMsg(null), 4000); return () => clearTimeout(t); }, [successMsg]);
 
   const handleApiKeyChange = (e) => {
     setApiKey(e.target.value);
@@ -990,7 +999,7 @@ export default function App() {
                           </td>
                         </tr>
                         );
-                      })}{tableData.length === 1 && !tableData[0].unitName && !tableData[0].questionType && (
+                      })}{tableData.length === 1 && !tableData[0].unitName && !tableData[0].learningPerformance && !tableData[0].learningContent && (
                         <tr><td colSpan={11} className="py-12 text-center">
                           <div className="flex flex-col items-center gap-3 text-slate-400">
                             <TableIcon size={36} className="opacity-30" />
