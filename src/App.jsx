@@ -7,6 +7,13 @@ import syllabusData from './data/syllabus.json';
 // ─── 版本更新紀錄 ───────────────────────────────────────────
 const CHANGELOG = [
   {
+    version: 'v2.6.2',
+    date: '2026-09-03',
+    title: '模型使用順序更新',
+    details: '根據需求，將 AI 模型的備援使用順序調整為：1. gemini-3.8-flash 2. gemini-3.7-flash 3. gemini-3.6-flash 4. gemini-3.1-pro-preview',
+    bugFixes: [],
+  },
+  {
     version: 'v2.6.1',
     date: '2026-08-15',
     title: '模型使用順序調整',
@@ -539,9 +546,9 @@ export default function App() {
       請只回傳 JSON，不要包含任何 markdown 語法 (不要有 \`\`\`json 等) 或額外的說明文字。`);
 
       const MODEL_FALLBACK_CHAIN = [
+        'gemini-3.8-flash',
         'gemini-3.7-flash',
         'gemini-3.6-flash',
-        'gemini-3.5-flash',
         'gemini-3.1-pro-preview',
       ];
 
