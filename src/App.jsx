@@ -7,6 +7,13 @@ import syllabusData from './data/syllabus.json';
 // ─── 版本更新紀錄 ───────────────────────────────────────────
 const CHANGELOG = [
   {
+    version: 'v2.7.0',
+    date: '2026-09-30',
+    title: '無障礙設計 (Accessibility) 與體驗優化',
+    details: '根據 Apple Human Interface Guidelines 進行設計升級：① 修復淺色文字對比度過低的問題（提升至 HIG 建議標準）；② 為所有圖示按鈕（如刪除列、關閉視窗）補齊 aria-label 支援螢幕閱讀器；③ 修復拖曳上傳區塊的鍵盤焦點 (Focus) 樣式，支援純鍵盤操作；④ 新增支援使用 Escape (Esc) 鍵快速關閉所有對話框與彈出視窗。',
+    bugFixes: [],
+  },
+  {
     version: 'v2.6.2',
     date: '2026-09-03',
     title: '模型使用順序更新',
@@ -251,6 +258,18 @@ export default function App() {
       window.removeEventListener('dragover', preventDefault);
       window.removeEventListener('drop', preventDefault);
     };
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setShowChangelog(false);
+        setShowApiHelp(false);
+        setShowConfirmReset(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const [error, setError] = useState(null);
@@ -676,7 +695,7 @@ export default function App() {
                   <p className="text-xs text-slate-500">TestAnls · Intelligent Exam Analysis</p>
                 </div>
               </div>
-              <button onClick={() => setShowChangelog(false)} className="w-8 h-8 rounded-lg hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
+              <button aria-label="關閉更新紀錄" onClick={() => setShowChangelog(false)} className="w-8 h-8 rounded-lg hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors">
                 <X size={18} />
               </button>
             </div>
@@ -711,7 +730,7 @@ export default function App() {
 
             {/* Modal Footer */}
             <div className="px-6 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
-              <p className="text-xs text-slate-400">共 {CHANGELOG.length} 個版本紀錄</p>
+              <p className="text-xs text-slate-500">共 {CHANGELOG.length} 個版本紀錄</p>
               <button onClick={() => setShowChangelog(false)} className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 transition-colors">
                 關閉
               </button>
@@ -737,14 +756,14 @@ export default function App() {
           <div className="bg-red-50/80 backdrop-blur-md border border-red-200 text-red-700 p-4 rounded-2xl flex items-start gap-3 shadow-lg shadow-red-500/5 animate-in slide-in-from-top-4">
             <AlertCircle className="shrink-0 mt-0.5 text-red-500" size={20} />
             <p className="text-sm font-medium flex-1">{error}</p>
-            <button onClick={() => setError(null)} className="shrink-0 text-red-400 hover:text-red-600 transition-colors"><X size={16} /></button>
+            <button aria-label="關閉錯誤提示" onClick={() => setError(null)} className="shrink-0 text-red-500 hover:text-red-700 transition-colors"><X size={16} /></button>
           </div>
         )}
         {successMsg && (
           <div className="bg-emerald-50/80 backdrop-blur-md border border-emerald-200 text-emerald-800 p-4 rounded-2xl flex items-start gap-3 shadow-lg shadow-emerald-500/5 animate-in slide-in-from-top-4">
             <CheckCircle2 className="shrink-0 mt-0.5 text-emerald-500" size={20} />
             <p className="text-sm font-medium flex-1">{successMsg}</p>
-            <button onClick={() => setSuccessMsg(null)} className="shrink-0 text-emerald-500 hover:text-emerald-700 transition-colors"><X size={16} /></button>
+            <button aria-label="關閉成功提示" onClick={() => setSuccessMsg(null)} className="shrink-0 text-emerald-600 hover:text-emerald-800 transition-colors"><X size={16} /></button>
           </div>
         )}
 
@@ -769,7 +788,7 @@ export default function App() {
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-1">API Key (不記錄於本地端)</label>
                     <div className="relative">
-                      <Key size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <Key size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
                       <input 
                         type={showApiKey ? 'text' : 'password'} 
                         value={apiKey} 
@@ -777,7 +796,7 @@ export default function App() {
                         className="w-full pl-10 pr-10 py-3 bg-white/80 border border-slate-200/80 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-mono placeholder:font-sans shadow-sm" 
                         placeholder="請貼上您的 Google Gemini API Key..." 
                       />
-                      <button type="button" onClick={() => setShowApiKey(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+                      <button type="button" aria-label={showApiKey ? "隱藏 API Key" : "顯示 API Key"} onClick={() => setShowApiKey(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 transition-colors">
                         {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
                     </div>
@@ -786,7 +805,7 @@ export default function App() {
                   <div className="space-y-3 pt-2">
                     <div>
                       <label 
-                        className={`flex items-center gap-3 p-4 bg-white/80 border ${isDraggingSyllabus ? 'border-indigo-500 bg-indigo-50 shadow-md ring-2 ring-indigo-200' : 'border-slate-200/80 hover:border-indigo-300 hover:bg-indigo-50/50'} rounded-xl cursor-pointer transition-all shadow-sm group relative overflow-hidden`}
+                        className={`flex items-center gap-3 p-4 bg-white/80 border ${isDraggingSyllabus ? 'border-indigo-500 bg-indigo-50 shadow-md ring-2 ring-indigo-200' : 'border-slate-200/80 hover:border-indigo-300 hover:bg-indigo-50/50'} rounded-xl cursor-pointer transition-all shadow-sm group relative overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-1`}
                         onDragEnter={() => setIsDraggingSyllabus(true)}
                         onDragLeave={() => setIsDraggingSyllabus(false)}
                         onDrop={() => setIsDraggingSyllabus(false)}
@@ -798,7 +817,7 @@ export default function App() {
                         </div>
                         <div className="flex-1 min-w-0 pointer-events-none relative z-20">
                           <p className="text-sm font-semibold text-slate-700 truncate">上傳課本內容 (可點擊或拖曳)</p>
-                          <p className="text-xs text-slate-400 truncate">{syllabusFiles.length > 0 ? `已選取 ${syllabusFiles.length} 個檔案` : '選填：供 AI 分類單元與課綱'}</p>
+                          <p className="text-xs text-slate-500 truncate">{syllabusFiles.length > 0 ? `已選取 ${syllabusFiles.length} 個檔案` : '選填：供 AI 分類單元與課綱'}</p>
                         </div>
                       </label>
                       {syllabusFiles.length > 0 && (
@@ -806,7 +825,7 @@ export default function App() {
                           {syllabusFiles.map((f, i) => (
                             <span key={i} className="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full max-w-[160px]">
                               <span className="truncate">{f.name}</span>
-                              <button type="button" onClick={() => setSyllabusFiles(prev => prev.filter((_, idx) => idx !== i))} className="shrink-0 hover:text-red-500 transition-colors ml-0.5"><X size={10} /></button>
+                              <button type="button" aria-label={`移除檔案 ${f.name}`} onClick={() => setSyllabusFiles(prev => prev.filter((_, idx) => idx !== i))} className="shrink-0 hover:text-red-500 transition-colors ml-0.5"><X size={10} /></button>
                             </span>
                           ))}
                         </div>
@@ -815,7 +834,7 @@ export default function App() {
 
                     <div>
                       <label 
-                        className={`flex items-center gap-3 p-4 bg-white/80 border ${isDraggingTestPaper ? 'border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200' : 'border-slate-200/80 hover:border-blue-300 hover:bg-blue-50/50'} rounded-xl cursor-pointer transition-all shadow-sm group relative overflow-hidden`}
+                        className={`flex items-center gap-3 p-4 bg-white/80 border ${isDraggingTestPaper ? 'border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200' : 'border-slate-200/80 hover:border-blue-300 hover:bg-blue-50/50'} rounded-xl cursor-pointer transition-all shadow-sm group relative overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-1`}
                         onDragEnter={() => setIsDraggingTestPaper(true)}
                         onDragLeave={() => setIsDraggingTestPaper(false)}
                         onDrop={() => setIsDraggingTestPaper(false)}
@@ -827,14 +846,14 @@ export default function App() {
                         </div>
                         <div className="flex-1 min-w-0 pointer-events-none relative z-20">
                           <p className="text-sm font-semibold text-slate-700 truncate">上傳測驗考卷 (可點擊或拖曳)</p>
-                          <p className="text-xs text-slate-400 truncate">{testPaperFile ? testPaperFile.name : '準備交給 AI 分析'}</p>
+                          <p className="text-xs text-slate-500 truncate">{testPaperFile ? testPaperFile.name : '準備交給 AI 分析'}</p>
                         </div>
                       </label>
                       {testPaperFile && (
                         <div className="mt-2 pl-1">
                           <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full max-w-full">
                             <span className="truncate">{testPaperFile.name}</span>
-                            <button type="button" onClick={() => setTestPaperFile(null)} className="shrink-0 hover:text-red-500 transition-colors ml-0.5"><X size={10} /></button>
+                            <button type="button" aria-label="移除試卷檔案" onClick={() => setTestPaperFile(null)} className="shrink-0 hover:text-red-500 transition-colors ml-0.5"><X size={10} /></button>
                           </span>
                         </div>
                       )}
@@ -872,7 +891,7 @@ export default function App() {
 
             <div className="bg-white/80 backdrop-blur-xl p-6 rounded-3xl shadow-xl shadow-slate-200/40 border border-white/60">
               <h2 className="text-sm font-bold text-slate-800 mb-5 flex items-center gap-2">
-                <Settings size={18} className="text-slate-400" />
+                <Settings size={18} className="text-slate-500" />
                 試卷基本設定 (自動帶入)
               </h2>
               <div className="space-y-5">
@@ -951,7 +970,7 @@ export default function App() {
                         <th className="px-2 py-3 font-bold text-center border-r border-slate-100 bg-indigo-500/5 text-indigo-700" colSpan="2">應用、分析</th>
                         <th className="px-2 py-3 font-bold text-center bg-violet-500/5 text-violet-700" colSpan="2">評鑑、創造</th>
                       </tr>
-                      <tr className="border-b border-slate-200 bg-white text-xs font-semibold text-slate-400">
+                      <tr className="border-b border-slate-200 bg-white text-xs font-semibold text-slate-500">
                         <th className="p-0" colSpan="4"></th>
                         <th className="px-2 py-2 text-center border-r border-slate-100 bg-blue-50/30">題數</th>
                         <th className="px-2 py-2 text-center border-r border-slate-200 bg-blue-50/30">佔分</th>
@@ -1007,7 +1026,7 @@ export default function App() {
                           </td>
 
                           <td className="p-2 text-center">
-                             <button onClick={() => removeRow(row.id)} className="text-slate-300 hover:text-red-500 bg-transparent hover:bg-red-50 p-2 rounded-lg transition-all mx-auto block">
+                             <button aria-label="刪除此列" onClick={() => removeRow(row.id)} className="text-slate-300 hover:text-red-500 bg-transparent hover:bg-red-50 p-2 rounded-lg transition-all mx-auto block">
                                 <Trash2 size={16} />
                              </button>
                           </td>
@@ -1015,7 +1034,7 @@ export default function App() {
                         );
                       })}{tableData.length === 1 && !tableData[0].unitName && !tableData[0].learningPerformance && !tableData[0].learningContent && (
                         <tr><td colSpan={11} className="py-12 text-center">
-                          <div className="flex flex-col items-center gap-3 text-slate-400">
+                          <div className="flex flex-col items-center gap-3 text-slate-500">
                             <TableIcon size={36} className="opacity-30" />
                             <p className="text-sm font-semibold">表格目前是空的</p>
                             <p className="text-xs">請上傳考卷後點擊「開始 AI 自動分析」，或點擊右上角「新增列」手動填寫</p>
@@ -1030,7 +1049,7 @@ export default function App() {
               <div className="bg-slate-900 border-t border-slate-800 p-6 flex flex-col md:flex-row items-center justify-between gap-6 text-white shrink-0 relative z-20">
                 <div className="flex items-center gap-8">
                   <div>
-                    <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">知識、理解</p>
+                    <p className="text-slate-300 text-xs font-bold uppercase tracking-wider mb-1">知識、理解</p>
                     <div className="flex items-baseline gap-2">
                       <span className="text-2xl font-black text-blue-400">{totals.knowledge.score}</span>
                       <span className="text-sm font-medium text-slate-500">/ {totals.knowledge.count} 題</span>
@@ -1038,7 +1057,7 @@ export default function App() {
                   </div>
                   <div className="w-px h-8 bg-slate-800"></div>
                   <div>
-                    <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">應用、分析</p>
+                    <p className="text-slate-300 text-xs font-bold uppercase tracking-wider mb-1">應用、分析</p>
                     <div className="flex items-baseline gap-2">
                       <span className="text-2xl font-black text-indigo-400">{totals.application.score}</span>
                       <span className="text-sm font-medium text-slate-500">/ {totals.application.count} 題</span>
@@ -1046,7 +1065,7 @@ export default function App() {
                   </div>
                   <div className="w-px h-8 bg-slate-800"></div>
                   <div>
-                    <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">評鑑、創造</p>
+                    <p className="text-slate-300 text-xs font-bold uppercase tracking-wider mb-1">評鑑、創造</p>
                     <div className="flex items-baseline gap-2">
                       <span className="text-2xl font-black text-violet-400">{totals.evaluation.score}</span>
                       <span className="text-sm font-medium text-slate-500">/ {totals.evaluation.count} 題</span>
@@ -1056,12 +1075,12 @@ export default function App() {
 
                 <div className="flex items-center gap-6 bg-white/5 py-3 px-6 rounded-2xl border border-white/10">
                   <div className="text-right">
-                    <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">總題數</p>
+                    <p className="text-slate-300 text-xs font-bold uppercase tracking-wider mb-1">總題數</p>
                     <p className="text-2xl font-bold text-white">{totals.totalCount}</p>
                   </div>
                   <div className="w-px h-10 bg-slate-700"></div>
                   <div className="text-right">
-                    <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">總分數</p>
+                    <p className="text-slate-300 text-xs font-bold uppercase tracking-wider mb-1">總分數</p>
                     <p className="text-4xl font-black text-emerald-400 drop-shadow-sm">{totals.totalScore}</p>
                   </div>
                 </div>
