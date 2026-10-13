@@ -7,6 +7,13 @@ import syllabusData from './data/syllabus.json';
 // ─── 版本更新紀錄 ───────────────────────────────────────────
 const CHANGELOG = [
   {
+    version: 'v2.8.0',
+    date: '2026-10-14',
+    title: '新增 gemini-4-argon 模型與調用確認機制',
+    details: '① 將最新的模型選項 gemini-4-argon 納入備援模型鏈（排序於 gemini-3.1-pro-preview 之前）；② 實作調用前確認機制：在切換至 gemini-4-argon 前會主動彈出確認視窗，供使用者選擇「同意調用」、「略過此模型嘗試下一個備援」或「取消分析」，確保使用者知情；③ 支援 Esc 鍵快捷關閉模型確認對話框。',
+    bugFixes: [],
+  },
+  {
     version: 'v2.7.0',
     date: '2026-09-30',
     title: '無障礙設計 (Accessibility) 與體驗優化',
@@ -215,9 +222,19 @@ export default function App() {
   const [showApiHelp, setShowApiHelp] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [showConfirmReset, setShowConfirmReset] = useState(false);
+  const [modelConfirmDialog, setModelConfirmDialog] = useState(null);
   const [showApiKey, setShowApiKey] = useState(false);
   const [isDraggingSyllabus, setIsDraggingSyllabus] = useState(false);
   const [isDraggingTestPaper, setIsDraggingTestPaper] = useState(false);
+
+  const confirmModelUsage = (modelName) => {
+    return new Promise((resolve) => {
+      setModelConfirmDialog({
+        modelName,
+        resolve,
+      });
+    });
+  };
 
   const doReset = () => {
     localStorage.removeItem('testAnls_basicInfo');
@@ -234,7 +251,7 @@ export default function App() {
 
   useEffect(() => {
     let interval;
-    if (isAnalyzing) {
+    if (isAnalyzing && !modelConfirmDialog) {
       const texts = ['正在閱讀課綱與試卷...', '正在分析試卷內容...', '正在統整認知層次...', '正在產生雙向細目表...'];
       let i = 0;
       setLoadingText(texts[0]);
@@ -244,7 +261,7 @@ export default function App() {
       }, 3000);
     }
     return () => clearInterval(interval);
-  }, [isAnalyzing]);
+  }, [isAnalyzing, modelConfirmDialog]);
 
   useEffect(() => {
     const preventDefault = (e) => {
@@ -266,11 +283,15 @@ export default function App() {
         setShowChangelog(false);
         setShowApiHelp(false);
         setShowConfirmReset(false);
+        if (modelConfirmDialog) {
+          modelConfirmDialog.resolve('cancel');
+          setModelConfirmDialog(null);
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [modelConfirmDialog]);
 
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
@@ -568,6 +589,7 @@ export default function App() {
         'gemini-3.8-flash',
         'gemini-3.7-flash',
         'gemini-3.6-flash',
+        'gemini-4-argon',
         'gemini-3.1-pro-preview',
       ];
 
@@ -577,6 +599,18 @@ export default function App() {
       let lastError = null;
 
       for (const modelName of MODEL_FALLBACK_CHAIN) {
+        if (modelName === 'gemini-4-argon') {
+          setLoadingText(`等待確認是否調用 ${modelName}...`);
+          const decision = await confirmModelUsage(modelName);
+          if (decision === 'cancel') {
+            throw new Error(`已取消分析（未調用 ${modelName}）`);
+          }
+          if (decision === 'skip') {
+            console.warn(`使用者選擇略過 ${modelName}，切換至下一個備援模型...`);
+            continue;
+          }
+        }
+
         try {
           response = await ai.models.generateContent({ 
             model: modelName, 
@@ -1140,6 +1174,79 @@ export default function App() {
               </button>
               <button onClick={() => setShowConfirmReset(false)} className="w-full py-3.5 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold rounded-xl transition-all tracking-wide">
                 取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Model Confirmation Modal */}
+      {modelConfirmDialog && (
+        <div 
+          className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200" 
+          onClick={() => {
+            modelConfirmDialog.resolve('cancel');
+            setModelConfirmDialog(null);
+          }}
+        >
+          <div 
+            className="bg-white rounded-[2rem] shadow-2xl max-w-sm w-full p-8 flex flex-col items-center text-center animate-in zoom-in-95 duration-200 border border-slate-100" 
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-16 h-16 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center mb-5 shadow-inner">
+              <Sparkles size={32} strokeWidth={2.2} />
+            </div>
+
+            <h3 className="text-xl font-black text-slate-800 mb-2 tracking-tight">調用模型確認</h3>
+
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 my-3 text-left w-full">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                <span>目標備援模型</span>
+                <span className="bg-purple-100 text-purple-700 font-mono px-2 py-0.5 rounded-full font-bold">
+                  {modelConfirmDialog.modelName}
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                前面的快速模型暫無法回應，系統準備切換至最新備援模型 <b>{modelConfirmDialog.modelName}</b> 進行深度分析。
+              </p>
+            </div>
+
+            <p className="text-xs text-slate-500 mb-6 font-medium leading-relaxed">
+              此模型為最新的高階分析模型，請問是否同意調用？
+            </p>
+
+            <div className="w-full flex flex-col gap-2.5">
+              <button 
+                onClick={() => {
+                  const res = modelConfirmDialog.resolve;
+                  setModelConfirmDialog(null);
+                  res('confirm');
+                }}
+                className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold rounded-xl transition-all shadow-md shadow-indigo-500/20 tracking-wide text-sm active:scale-[0.99]"
+              >
+                同意並調用 {modelConfirmDialog.modelName}
+              </button>
+
+              <button 
+                onClick={() => {
+                  const res = modelConfirmDialog.resolve;
+                  setModelConfirmDialog(null);
+                  res('skip');
+                }}
+                className="w-full py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl transition-all text-sm active:scale-[0.99]"
+              >
+                略過此模型，嘗試下一個備援
+              </button>
+
+              <button 
+                onClick={() => {
+                  const res = modelConfirmDialog.resolve;
+                  setModelConfirmDialog(null);
+                  res('cancel');
+                }}
+                className="w-full py-2.5 text-xs text-slate-400 hover:text-slate-600 font-medium transition-colors"
+              >
+                取消本次分析
               </button>
             </div>
           </div>
