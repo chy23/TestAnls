@@ -8,6 +8,13 @@ import ModelHubManager from './components/ModelHubManager';
 // ─── 版本更新紀錄 ───────────────────────────────────────────
 const CHANGELOG = [
   {
+    version: 'v2.10.0',
+    date: '2026-10-26',
+    title: '串接 Antigravity Model Hub 本機模型管理系統',
+    details: '① 本專案完全解耦，不自行打包模型或推論引擎，完全連線至本機「Antigravity Model Hub（運行於 127.0.0.1:51123）」；② 支援 gemma-4-E2B-it-Q4_K_M 與 Llama-3.2-3B-Instruct 目標模型；③ 實作使用前狀態檢測與自動喚醒協定（antigravity-hub://launch）；④ 實作 /api/ensure-model 檢測，模型尚未下載時提示 Model Hub 自動下載視窗；⑤ 透過 /api/generate 直送推論請求。',
+    bugFixes: [],
+  },
+  {
     version: 'v2.9.0',
     date: '2026-10-25',
     title: '支援 Electron 桌面端與本機共享 GGUF 模型庫',
@@ -225,7 +232,8 @@ export default function App() {
 
   const isDesktop = typeof window !== 'undefined' && !!window.electronAPI?.isDesktop;
   const [engineMode, setEngineMode] = useState('cloud'); // 'cloud' | 'local'
-  const [localModelLoaded, setLocalModelLoaded] = useState(false);
+  const [selectedLocalModel, setSelectedLocalModel] = useState('gemma-4-E2B-it-Q4_K_M.gguf');
+  const [hubModelReady, setHubModelReady] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [loadingText, setLoadingText] = useState('準備分析中...');
   const [syllabusFiles, setSyllabusFiles] = useState([]);
@@ -541,16 +549,44 @@ export default function App() {
 
   const handleAIAnalysis = async () => {
     if (engineMode === 'local') {
-      if (!window.electronAPI?.generateAi) {
-        setError("本機推論環境尚未就緒，請確認是否於桌面版執行。");
-        return;
-      }
       if (!testPaperFile) { setError("請上傳一份試卷檔案供 AI 進行分析！"); setSuccessMsg(null); return; }
 
       setIsAnalyzing(true); setError(null); setSuccessMsg(null);
-      setLoadingText("正在使用本機離線 GGUF 模型推論中...");
+      setLoadingText("正在連線 Antigravity Model Hub (127.0.0.1:51123)...");
 
       try {
+        // 1. 檢查 Hub 服務狀態
+        try {
+          const statusRes = await fetch('http://127.0.0.1:51123/api/status', {
+            method: 'GET',
+            signal: AbortSignal.timeout(3000)
+          });
+          if (!statusRes.ok) throw new Error("Model Hub 服務狀態異常");
+        } catch (e) {
+          if (window.electronAPI?.launchHub) {
+            window.electronAPI.launchHub();
+          }
+          throw new Error("無法連線至 Antigravity Model Hub (127.0.0.1:51123)！請開啟「Antigravity Model Hub.app」後重試。");
+        }
+
+        // 2. 確認模型是否已下載與載入
+        setLoadingText(`正在向 Model Hub 確認 ${selectedLocalModel} 載入狀態...`);
+        const ensureRes = await fetch('http://127.0.0.1:51123/api/ensure-model', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ modelId: selectedLocalModel, autoLoad: true })
+        });
+        const ensureData = await ensureRes.json();
+
+        if (ensureData.exists === false) {
+          throw new Error(`模型 [${selectedLocalModel}] 尚未下載。Model Hub 已自動彈出下載確認視窗，請於 Model Hub 確認下載後再試。`);
+        }
+        if (!ensureData.ready) {
+          throw new Error(`模型載入失敗：${ensureData.error || '請至 Model Hub 檢查記憶體與模型狀態'}`);
+        }
+
+        // 3. 調用推論
+        setLoadingText(`Antigravity Model Hub 正在推論試卷內容 (${selectedLocalModel})...`);
         let promptText = `這是一份測驗卷分析請求。請根據 108 課綱資料庫將試卷試題歸納出雙向細目表，並提取基本資訊。\n`;
         promptText += `內建 108 課綱資料庫：\n${JSON.stringify(syllabusData)}\n`;
         promptText += `試卷檔名：${testPaperFile.name}。\n`;
@@ -561,7 +597,7 @@ export default function App() {
 1. 單元名稱 (unitName) 請一律使用大單元呈現，格式統一為「第X單元 OOO」或「X. OOO」。
 2. 同一個單元若有多個題型，請產生多個 row，但 unitName 必須完全一模一樣以供合併。
 3. 題型 (questionType) 必須根據考卷大題分類（如「一、選擇題」）。
-請將分析結果以嚴格的 JSON 格式回傳，格式如下：
+請將分析結果以嚴格的 JSON 格式回傳，格式範例如下：
 {
   "academicYear": "112",
   "semester": "上",
@@ -583,18 +619,21 @@ export default function App() {
 }
 注意：只回傳純 JSON，不要包含任何 markdown 標記 (不要有 \`\`\`json 等) 或額外說明文字。`;
 
-        const unsub = window.electronAPI.onChunk ? window.electronAPI.onChunk((chunk) => {
-          setLoadingText("本機模型推論中：" + (chunk.slice(-15) || '...'));
-        }) : null;
+        const genRes = await fetch('http://127.0.0.1:51123/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: promptText,
+            modelId: selectedLocalModel
+          })
+        });
 
-        const res = await window.electronAPI.generateAi({ prompt: promptText });
-        if (unsub) unsub();
-
-        if (!res || !res.success) {
-          throw new Error(res?.error || "本機離線模型推論失敗，請確認模型是否已載入就緒。");
+        const genData = await genRes.json();
+        if (!genData.success) {
+          throw new Error(genData.error || "Model Hub 本機推論失敗");
         }
 
-        const rawText = res.text;
+        const rawText = genData.text;
         const cleaned = rawText.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '');
         const parsedData = JSON.parse(cleaned);
 
@@ -629,12 +668,12 @@ export default function App() {
             };
           });
           setTableData(newData);
-          setSuccessMsg(`本機離線 AI 分析成功！試卷基本設定與雙向細目表已自動更新。`);
+          setSuccessMsg(`Antigravity Model Hub 分析成功！（使用模型：${selectedLocalModel}）試卷設定與雙向細目表已更新。`);
         } else {
-          setError("本機 AI 分析完成，但回傳格式有誤，請重試。");
+          setError("Model Hub 回傳格式無法解析為雙向細目表，請重試。");
         }
       } catch (err) {
-        setError(err.message || "本機推論過程發生錯誤。");
+        setError(err.message || "Model Hub 本機推論過程發生錯誤。");
       } finally {
         setIsAnalyzing(false);
       }
@@ -927,7 +966,7 @@ export default function App() {
                   <div>
                     <h2 className="text-lg font-bold text-slate-800 tracking-tight">AI 智能分析</h2>
                     <p className="text-xs font-medium text-slate-500">
-                      {engineMode === 'local' ? 'Powered by 本機離線推論 (node-llama-cpp)' : 'Powered by Google Gemini'}
+                      {engineMode === 'local' ? 'Powered by Antigravity Model Hub (127.0.0.1:51123)' : 'Powered by Google Gemini'}
                     </p>
                   </div>
                 </div>
@@ -946,23 +985,27 @@ export default function App() {
                       onClick={() => setEngineMode('local')}
                       className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all ${engineMode === 'local' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
                     >
-                      <Cpu size={14} /> 本機離線模型 (GGUF)
+                      <Cpu size={14} /> 本機模型庫 (Model Hub)
                     </button>
                   </div>
                 )}
                 
                 <div className="space-y-5 flex-1">
                   {engineMode === 'local' ? (
-                    <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4 shadow-sm space-y-3">
+                    <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-3.5 shadow-sm space-y-2.5">
                       <div className="flex items-center gap-2">
                         <Cpu size={16} className="text-indigo-600" />
-                        <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">本機離線推論引擎</span>
+                        <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Antigravity Model Hub 串接</span>
                         <span className="ml-auto text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">免 API Key</span>
                       </div>
                       <p className="text-xs text-slate-500 leading-relaxed">
-                        直接使用您的 Mac/PC 硬體加速執行，不消耗任何 API 額度，試卷與課本內容完全保留於本機。
+                        直接串接電腦中已安裝的「Antigravity Model Hub」，免填 API Key，完全離線推論。
                       </p>
-                      <ModelHubManager onModelLoaded={() => setLocalModelLoaded(true)} />
+                      <ModelHubManager 
+                        selectedModel={selectedLocalModel}
+                        onSelectModel={(m) => setSelectedLocalModel(m)}
+                        onModelReady={(info) => setHubModelReady(info.ready)}
+                      />
                     </div>
                   ) : (
                     <div className="space-y-1.5">

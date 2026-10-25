@@ -1,6 +1,5 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
-const { ModelManager } = require('./modelManager.cjs');
 
 let mainWindow = null;
 
@@ -21,9 +20,6 @@ function createWindow() {
     }
   });
 
-  const modelManager = new ModelManager(mainWindow);
-  modelManager.registerIpc();
-
   const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
   if (isDev && process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
@@ -35,6 +31,25 @@ function createWindow() {
     mainWindow = null;
   });
 }
+
+// 註冊 IPC：喚醒 Antigravity Model Hub (本機模型中樞)
+ipcMain.handle('launch-hub', async () => {
+  try {
+    await shell.openExternal('antigravity-hub://launch');
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// 安全開啟外部網址
+ipcMain.handle('open-external', async (event, url) => {
+  if (url && (url.startsWith('https://') || url.startsWith('http://') || url.startsWith('antigravity-hub://'))) {
+    await shell.openExternal(url);
+    return { success: true };
+  }
+  return { success: false, error: '非法的外部連結' };
+});
 
 app.whenReady().then(() => {
   createWindow();
