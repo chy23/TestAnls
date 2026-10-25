@@ -15,7 +15,8 @@
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
     "electron:start": "electron .",
-    "electron:build:mac": "npm run build && electron-builder --mac --arm64"
+    "electron:build:mac": "npm run build && electron-builder --mac --arm64",
+    "release:icloud": "npm run electron:build:mac && node scripts/copy-to-icloud.cjs"
   },
   "dependencies": {
     "@google/genai": "^2.13.0",
