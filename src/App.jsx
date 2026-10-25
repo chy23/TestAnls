@@ -1,11 +1,19 @@
 // 網站建立自楊家驊老師 The website was created by Teacher ChiahuaYang
 import React, { useState, useEffect } from 'react';
-import { Upload, FileText, Download, Plus, Trash2, Settings, Table as TableIcon, Sparkles, Key, AlertCircle, Loader2, LayoutGrid, CheckCircle2, FileUp, ExternalLink, Info, X, History, Tag, Eye, EyeOff } from 'lucide-react';
+import { Upload, FileText, Download, Plus, Trash2, Settings, Table as TableIcon, Sparkles, Key, AlertCircle, Loader2, LayoutGrid, CheckCircle2, FileUp, ExternalLink, Info, X, History, Tag, Eye, EyeOff, Cpu, Cloud } from 'lucide-react';
 import { saveAs } from 'file-saver';
 import syllabusData from './data/syllabus.json';
+import ModelHubManager from './components/ModelHubManager';
 
 // ─── 版本更新紀錄 ───────────────────────────────────────────
 const CHANGELOG = [
+  {
+    version: 'v2.9.0',
+    date: '2026-10-25',
+    title: '支援 Electron 桌面端與本機共享 GGUF 模型庫',
+    details: '① 建立解耦的本機共享模型庫架構（預設路徑 ~/Models，支援 Meta Llama 3.2 3B 與 Google Gemma 4 E4B 等 GGUF 模型）；② 支援動態掃描社群微調模型與 Apple Silicon Metal 硬體加速；③ 實作「雲端 Gemini API」與「本機離線推論」雙軌切換機制；④ 新增 macOS 輕量打包與 iCloud 發布配置。',
+    bugFixes: [],
+  },
   {
     version: 'v2.8.0',
     date: '2026-10-14',
@@ -215,6 +223,9 @@ export default function App() {
     localStorage.setItem('testAnls_tableData', JSON.stringify(tableData));
   }, [tableData]);
 
+  const isDesktop = typeof window !== 'undefined' && !!window.electronAPI?.isDesktop;
+  const [engineMode, setEngineMode] = useState('cloud'); // 'cloud' | 'local'
+  const [localModelLoaded, setLocalModelLoaded] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [loadingText, setLoadingText] = useState('準備分析中...');
   const [syllabusFiles, setSyllabusFiles] = useState([]);
@@ -529,6 +540,107 @@ export default function App() {
   };
 
   const handleAIAnalysis = async () => {
+    if (engineMode === 'local') {
+      if (!window.electronAPI?.generateAi) {
+        setError("本機推論環境尚未就緒，請確認是否於桌面版執行。");
+        return;
+      }
+      if (!testPaperFile) { setError("請上傳一份試卷檔案供 AI 進行分析！"); setSuccessMsg(null); return; }
+
+      setIsAnalyzing(true); setError(null); setSuccessMsg(null);
+      setLoadingText("正在使用本機離線 GGUF 模型推論中...");
+
+      try {
+        let promptText = `這是一份測驗卷分析請求。請根據 108 課綱資料庫將試卷試題歸納出雙向細目表，並提取基本資訊。\n`;
+        promptText += `內建 108 課綱資料庫：\n${JSON.stringify(syllabusData)}\n`;
+        promptText += `試卷檔名：${testPaperFile.name}。\n`;
+        if (syllabusFiles.length > 0) {
+          promptText += `參考課本檔名：${syllabusFiles.map(f => f.name).join(', ')}。\n`;
+        }
+        promptText += `【重要格式要求】：
+1. 單元名稱 (unitName) 請一律使用大單元呈現，格式統一為「第X單元 OOO」或「X. OOO」。
+2. 同一個單元若有多個題型，請產生多個 row，但 unitName 必須完全一模一樣以供合併。
+3. 題型 (questionType) 必須根據考卷大題分類（如「一、選擇題」）。
+請將分析結果以嚴格的 JSON 格式回傳，格式如下：
+{
+  "academicYear": "112",
+  "semester": "上",
+  "grade": "三",
+  "subject": "國語",
+  "rows": [
+    {
+      "unitName": "第一單元 認識文字",
+      "learningPerformance": "1-I-1",
+      "learningContent": "Ab-I-1",
+      "questionType": "一、選擇題",
+      "cognitiveScores": {
+        "knowledge": { "count": 2, "score": 4 },
+        "application": { "count": 1, "score": 2 },
+        "evaluation": { "count": 0, "score": 0 }
+      }
+    }
+  ]
+}
+注意：只回傳純 JSON，不要包含任何 markdown 標記 (不要有 \`\`\`json 等) 或額外說明文字。`;
+
+        const unsub = window.electronAPI.onChunk ? window.electronAPI.onChunk((chunk) => {
+          setLoadingText("本機模型推論中：" + (chunk.slice(-15) || '...'));
+        }) : null;
+
+        const res = await window.electronAPI.generateAi({ prompt: promptText });
+        if (unsub) unsub();
+
+        if (!res || !res.success) {
+          throw new Error(res?.error || "本機離線模型推論失敗，請確認模型是否已載入就緒。");
+        }
+
+        const rawText = res.text;
+        const cleaned = rawText.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '');
+        const parsedData = JSON.parse(cleaned);
+
+        setBasicInfo(prev => ({
+          ...prev,
+          academicYear: parsedData.academicYear || prev.academicYear,
+          semester: parsedData.semester || prev.semester,
+          grade: parsedData.grade || prev.grade,
+          subject: parsedData.subject || prev.subject,
+        }));
+
+        if (Array.isArray(parsedData.rows) && parsedData.rows.length > 0) {
+          const unitsMap = {};
+          parsedData.rows.forEach(row => {
+            const uName = row.unitName || '未命名單元';
+            if (!unitsMap[uName]) unitsMap[uName] = { perf: new Set(), cont: new Set() };
+            if (row.learningPerformance) row.learningPerformance.split(/[,\n、]/).map(s => s.trim()).filter(Boolean).forEach(s => unitsMap[uName].perf.add(s));
+            if (row.learningContent) row.learningContent.split(/[,\n、]/).map(s => s.trim()).filter(Boolean).forEach(s => unitsMap[uName].cont.add(s));
+          });
+
+          const newData = parsedData.rows.map((row, idx) => {
+            const uName = row.unitName || '未命名單元';
+            return {
+              id: Date.now() + idx,
+              unitName: uName,
+              learningPerformance: Array.from(unitsMap[uName].perf).join('\n'),
+              learningContent: Array.from(unitsMap[uName].cont).join('\n'),
+              questionType: row.questionType || '選擇題',
+              cognitiveScores: row.cognitiveScores || {
+                knowledge: { count: 0, score: 0 }, application: { count: 0, score: 0 }, evaluation: { count: 0, score: 0 }
+              }
+            };
+          });
+          setTableData(newData);
+          setSuccessMsg(`本機離線 AI 分析成功！試卷基本設定與雙向細目表已自動更新。`);
+        } else {
+          setError("本機 AI 分析完成，但回傳格式有誤，請重試。");
+        }
+      } catch (err) {
+        setError(err.message || "本機推論過程發生錯誤。");
+      } finally {
+        setIsAnalyzing(false);
+      }
+      return;
+    }
+
     if (!apiKey) { 
       setError("請先填寫 API Key 才能進行自動分析！"); 
       setShowApiHelp(true);
@@ -814,27 +926,62 @@ export default function App() {
                   </div>
                   <div>
                     <h2 className="text-lg font-bold text-slate-800 tracking-tight">AI 智能分析</h2>
-                    <p className="text-xs font-medium text-slate-500">Powered by Google Gemini</p>
+                    <p className="text-xs font-medium text-slate-500">
+                      {engineMode === 'local' ? 'Powered by 本機離線推論 (node-llama-cpp)' : 'Powered by Google Gemini'}
+                    </p>
                   </div>
                 </div>
+
+                {isDesktop && (
+                  <div className="flex bg-slate-100 p-1 rounded-xl mb-4 text-xs font-bold border border-slate-200/60 shadow-inner">
+                    <button 
+                      type="button" 
+                      onClick={() => setEngineMode('cloud')}
+                      className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all ${engineMode === 'cloud' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                    >
+                      <Cloud size={14} /> 雲端 Gemini API
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => setEngineMode('local')}
+                      className={`flex-1 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all ${engineMode === 'local' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                    >
+                      <Cpu size={14} /> 本機離線模型 (GGUF)
+                    </button>
+                  </div>
+                )}
                 
                 <div className="space-y-5 flex-1">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-1">API Key (不記錄於本地端)</label>
-                    <div className="relative">
-                      <Key size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                      <input 
-                        type={showApiKey ? 'text' : 'password'} 
-                        value={apiKey} 
-                        onChange={handleApiKeyChange} 
-                        className="w-full pl-10 pr-10 py-3 bg-white/80 border border-slate-200/80 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-mono placeholder:font-sans shadow-sm" 
-                        placeholder="請貼上您的 Google Gemini API Key..." 
-                      />
-                      <button type="button" aria-label={showApiKey ? "隱藏 API Key" : "顯示 API Key"} onClick={() => setShowApiKey(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 transition-colors">
-                        {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
+                  {engineMode === 'local' ? (
+                    <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4 shadow-sm space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Cpu size={16} className="text-indigo-600" />
+                        <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">本機離線推論引擎</span>
+                        <span className="ml-auto text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">免 API Key</span>
+                      </div>
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        直接使用您的 Mac/PC 硬體加速執行，不消耗任何 API 額度，試卷與課本內容完全保留於本機。
+                      </p>
+                      <ModelHubManager onModelLoaded={() => setLocalModelLoaded(true)} />
                     </div>
-                  </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-1">API Key (不記錄於本地端)</label>
+                      <div className="relative">
+                        <Key size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                        <input 
+                          type={showApiKey ? 'text' : 'password'} 
+                          value={apiKey} 
+                          onChange={handleApiKeyChange} 
+                          className="w-full pl-10 pr-10 py-3 bg-white/80 border border-slate-200/80 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-sm font-mono placeholder:font-sans shadow-sm" 
+                          placeholder="請貼上您的 Google Gemini API Key..." 
+                        />
+                        <button type="button" aria-label={showApiKey ? "隱藏 API Key" : "顯示 API Key"} onClick={() => setShowApiKey(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700 transition-colors">
+                          {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="space-y-3 pt-2">
                     <div>

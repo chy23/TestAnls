@@ -1,0 +1,22 @@
+{
+  "appId": "com.teacher.testanls",
+  "productName": "TestAnls 雙向細目表分析",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "package.json"
+  ],
+  "mac": {
+    "target": [
+      { "target": "dmg", "arch": ["arm64"] },
+      { "target": "zip", "arch": ["arm64"] }
+    ],
+    "category": "public.app-category.education",
+    "hardenedRuntime": false,
+    "gatekeeperAssess": false,
+    "identity": null
+  }
+}
