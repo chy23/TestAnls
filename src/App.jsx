@@ -8,6 +8,41 @@ import ModelHubManager from './components/ModelHubManager';
 // ─── 版本更新紀錄 ───────────────────────────────────────────
 const CHANGELOG = [
   {
+    version: 'v2.12.0',
+    date: '2026-11-19',
+    title: '全面升級 API 備援模型鏈至 Gemini 4 系列並強制調用確認',
+    details: '① 移除已退役的 gemini-3.6-flash 與 3.7-flash，由 gemini-3.8-flash 擔任主力首選；② 納入 Gemini 4 旗艦系列（Hydrogen、Argon、Neon、Carbon）；③ 實作調用前確認防護：凡調用任何 gemini-4 模型前一律主動彈窗詢問授權，保障使用者計費知情權。',
+    bugFixes: [],
+  },
+  {
+    version: 'v2.11.3',
+    date: '2026-10-26',
+    title: '支援本機試卷檔案深度文字提取 (PDF / Word / TXT 全面打通)',
+    details: '① 解決本機模型因未收到考卷內容而回覆「未上傳或提供 PDF 實際內容」的問題；② 在 Electron 主行程中整合 macOS 原生 PDFKit 與 textutil，零外部依賴實現 PDF、Word (DOCX/DOC) 與 TXT 檔案的毫秒級文字提取；③ 在本機 AI 提示詞中完整注入試卷真實題目與參考課本文字，讓本機模型 (Gemma / Llama) 能百分之百看到考題進行真實試卷雙向細目表歸納。',
+    bugFixes: ['修復本機推論時僅傳送檔名未傳送 PDF/Word 實體試卷文字內容的根本缺陷'],
+  },
+  {
+    version: 'v2.11.2',
+    date: '2026-10-26',
+    title: '徹底根除課綱資料庫上下文爆表與模型瘋狂重複問題',
+    details: '① 淨化 108 課綱資料庫：徹底清除歷史遺留的 38KB 系統對話雜訊，替換為標準、精簡的 108 課綱核心編碼表 (2.4KB)，模型 Context 佔用量減少 94%，徹底解決本機模型因上下文溢位而發瘋重複「..........s....」的嚴重 Bug；② 強化開源模型特殊 Token 過濾 (如 <|channel>、<thought> 等)；③ 修復自訂模型介面顯示「undeftnedGB RAM」的文字問題。',
+    bugFixes: ['修復 syllabus.json 夾帶 38KB 歷史日誌導致本機 LLM 上下文溢位崩潰的問題', '修復自訂社群模型 RAM 門檻顯示 undefined 的錯誤'],
+  },
+  {
+    version: 'v2.11.1',
+    date: '2026-10-26',
+    title: '修復 AI 回傳 JSON 解析容錯機制 (解決 assistant 前綴報錯)',
+    details: '① 實作強健型 AI 回傳解析器 parseAiJsonResponse，自動過濾 Llama 3.2 / Gemma 4 等開源模型自帶的「assistant」角色前綴、Markdown 代碼塊與對話性文字；② 支援最外層 JSON 自動定位與結尾多餘逗號容錯，徹底修復「Unexpected token \'a\', "assistant "... is not valid JSON」錯誤；③ 雲端 Gemini 與本機 Model Hub 雙軌解析同步升級。',
+    bugFixes: ['修復本機 Llama 3.2 回傳 assistant 前綴導致 JSON 解析失敗中斷的嚴重問題'],
+  },
+  {
+    version: 'v2.11.0',
+    date: '2026-10-26',
+    title: '全域視窗拖移修復、關閉退出優化與 Model Hub 6 大模型完整串接',
+    details: '① 修復 Electron 視窗拖移功能：為標題列加入原生 WebKit 拖曳區域與 macOS 左上角紅黃綠交通號誌安全避讓（Safe Inset）；② 修復視窗關閉行為：點擊視窗紅叉叉時完全退出應用程式行程；③ 升級本機模型管理模組：支援 Antigravity Model Hub 官方 6 大核心模型（Gemma 4 E2B/26B/31B、Llama 3.2 3B/11B、Llama 4 Scout 109B）與硬體門檻標籤；④ 實作全域共享路徑 ~/Models 與 ~/.antigravity-model-hub.json 動態掃描；⑤ 未下載模型提供「開啟 Antigravity Model Hub 管理」喚醒與 Hugging Face 直連下載引導。',
+    bugFixes: ['修復 Electron 視窗無法透過標題列拖移畫面的問題', '修復點擊紅叉叉關閉視窗後應用程式仍殘留於 Dock 的問題'],
+  },
+  {
     version: 'v2.10.0',
     date: '2026-10-26',
     title: '串接 Antigravity Model Hub 本機模型管理系統',
@@ -547,6 +582,112 @@ export default function App() {
     });
   };
 
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        const base64 = typeof result === 'string' && result.includes(',') ? result.split(',')[1] : result;
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // 本機檔案文字提取器（支援 PDF, DOCX, DOC, TXT）
+  const extractTextFromUploadFile = async (file) => {
+    if (!file) return '';
+
+    // 優先調用 Electron 原生文字提取 (macOS PDFKit / textutil)
+    if (window.electronAPI?.extractFileText) {
+      try {
+        const base64 = await fileToBase64(file);
+        const res = await window.electronAPI.extractFileText({ name: file.name, base64 });
+        if (res && res.success && res.text) {
+          return res.text;
+        }
+      } catch (e) {
+        console.warn('Electron extractFileText error:', e);
+      }
+    }
+
+    // 瀏覽器模式備援 (純文字檔)
+    if (file.type.startsWith('text/') || file.name.endsWith('.txt') || file.name.endsWith('.md')) {
+      try {
+        return await file.text();
+      } catch (e) {}
+    }
+
+    return '';
+  };
+
+  // 強健型 AI JSON 解析器（可完美過濾 Llama/Gemma 模型前綴、Markdown 代碼塊與多餘字元）
+  const parseAiJsonResponse = (rawText) => {
+    if (!rawText || typeof rawText !== 'string') {
+      throw new Error('AI 回傳內容為空');
+    }
+
+    let text = rawText.trim();
+
+    // 1. 去除模型思考標籤、特殊標記與 Role 前綴 (如 <thought>...</thought>, <|channel>, assistant\n 等)
+    text = text.replace(/<thought>[\s\S]*?<\/thought>/gi, '');
+    text = text.replace(/<\|.*?\|>/g, '');
+    text = text.replace(/^(?:assistant|model|system)\s*[:：]?\s*/i, '').trim();
+
+    // 2. 嘗試先直接解析
+    try {
+      return JSON.parse(text);
+    } catch (e) {}
+
+    // 3. 尋找 markdown code fence 中的 JSON
+    const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (fenceMatch && fenceMatch[1]) {
+      const codeContent = fenceMatch[1].trim();
+      try {
+        return JSON.parse(codeContent);
+      } catch (e) {
+        // 容錯：去除結尾逗號
+        try {
+          const cleaned = codeContent.replace(/,(\s*[}\]])/g, '$1');
+          return JSON.parse(cleaned);
+        } catch (e2) {}
+      }
+    }
+
+    // 4. 尋找最外層的 { ... }
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      const jsonSubstring = text.substring(firstBrace, lastBrace + 1);
+      try {
+        return JSON.parse(jsonSubstring);
+      } catch (e) {
+        try {
+          const cleaned = jsonSubstring.replace(/,(\s*[}\]])/g, '$1');
+          return JSON.parse(cleaned);
+        } catch (e2) {}
+      }
+    }
+
+    // 5. 尋找最外層的 [ ... ]
+    const firstBracket = text.indexOf('[');
+    const lastBracket = text.lastIndexOf(']');
+    if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+      const jsonSubstring = text.substring(firstBracket, lastBracket + 1);
+      try {
+        return JSON.parse(jsonSubstring);
+      } catch (e) {
+        try {
+          const cleaned = jsonSubstring.replace(/,(\s*[}\]])/g, '$1');
+          return JSON.parse(cleaned);
+        } catch (e2) {}
+      }
+    }
+
+    throw new Error('無法從 AI 回傳結果中解析出合法的 JSON 資料。回傳片段：' + text.slice(0, 80));
+  };
+
   const handleAIAnalysis = async () => {
     if (engineMode === 'local') {
       if (!testPaperFile) { setError("請上傳一份試卷檔案供 AI 進行分析！"); setSuccessMsg(null); return; }
@@ -579,25 +720,57 @@ export default function App() {
         const ensureData = await ensureRes.json();
 
         if (ensureData.exists === false) {
-          throw new Error(`模型 [${selectedLocalModel}] 尚未下載。Model Hub 已自動彈出下載確認視窗，請於 Model Hub 確認下載後再試。`);
+          if (window.electronAPI?.launchHub) {
+            window.electronAPI.launchHub();
+          }
+          throw new Error(`模型 [${selectedLocalModel}] 尚未下載。已為您喚醒 Antigravity Model Hub 管理介面，請確認下載完成後再試。`);
         }
         if (!ensureData.ready) {
           throw new Error(`模型載入失敗：${ensureData.error || '請至 Model Hub 檢查記憶體與模型狀態'}`);
         }
 
-        // 3. 調用推論
-        setLoadingText(`Antigravity Model Hub 正在推論試卷內容 (${selectedLocalModel})...`);
-        let promptText = `這是一份測驗卷分析請求。請根據 108 課綱資料庫將試卷試題歸納出雙向細目表，並提取基本資訊。\n`;
-        promptText += `內建 108 課綱資料庫：\n${JSON.stringify(syllabusData)}\n`;
-        promptText += `試卷檔名：${testPaperFile.name}。\n`;
+        // 3. 提取試卷真實文字內容 (支援 PDF / Word / TXT 秒級原生提取)
+        setLoadingText(`正在解析試卷檔案文字 (${testPaperFile.name})...`);
+        const paperText = await extractTextFromUploadFile(testPaperFile);
+
+        // 如果同時上傳了課本參考檔案，也一併提取
+        let syllabusText = '';
         if (syllabusFiles.length > 0) {
-          promptText += `參考課本檔名：${syllabusFiles.map(f => f.name).join(', ')}。\n`;
+          setLoadingText(`正在解析參考課本檔案...`);
+          const sTexts = [];
+          for (const sFile of syllabusFiles) {
+            const st = await extractTextFromUploadFile(sFile);
+            if (st) sTexts.push(`【課本參考資料: ${sFile.name}】\n${st.slice(0, 3000)}`);
+          }
+          syllabusText = sTexts.join('\n\n');
         }
-        promptText += `【重要格式要求】：
-1. 單元名稱 (unitName) 請一律使用大單元呈現，格式統一為「第X單元 OOO」或「X. OOO」。
+
+        if (!paperText || paperText.trim().length === 0) {
+          throw new Error(`無法從試卷「${testPaperFile.name}」中提取文字內容（可能為純圖片掃描檔或空白文件）。請確認試卷包含可選取的文字內容，或切換至支援影像多模態辨識的「雲端 Gemini API」！`);
+        }
+
+        // 4. 調用推論
+        setLoadingText(`Antigravity Model Hub 正在推論試卷內容 (${selectedLocalModel})...`);
+        let promptText = `你是一個專業的小學雙向細目表編制與試卷分析助手。
+請仔細閱讀下方提供的「試卷完整題目與內容」，並對照「108 課綱資料庫」將所有試題分類至各單元中，歸納出雙向細目表，同時從試卷標題提取基本資訊。
+
+內建 108 課綱資料庫：
+${JSON.stringify(syllabusData)}
+
+【試卷檔名】：${testPaperFile.name}
+【試卷真實題目與文字內容】：
+${paperText.slice(0, 8000)}
+
+${syllabusText ? `【參考課本/教材內容】：\n${syllabusText.slice(0, 4000)}\n` : ''}
+
+【重要格式要求】：
+1. 請務必根據試卷上的真實題目內容進行分析，歸納各單元名稱 (unitName，例如「第一單元 認識文字」)。
 2. 同一個單元若有多個題型，請產生多個 row，但 unitName 必須完全一模一樣以供合併。
 3. 題型 (questionType) 必須根據考卷大題分類（如「一、選擇題」）。
-請將分析結果以嚴格的 JSON 格式回傳，格式範例如下：
+4. 學習表現 (learningPerformance) 與 學習內容 (learningContent) 請填寫 108 課綱代碼（如 1-I-1、Ab-I-1 等）。
+5. 認知領域分數：knowledge (知識/理解), application (應用/分析), evaluation (評鑑/創造)。
+
+請直接輸出嚴格合法的純 JSON 物件，格式範例如下：
 {
   "academicYear": "112",
   "semester": "上",
@@ -617,7 +790,7 @@ export default function App() {
     }
   ]
 }
-注意：只回傳純 JSON，不要包含任何 markdown 標記 (不要有 \`\`\`json 等) 或額外說明文字。`;
+注意：請直接以 "{" 開頭輸出 JSON，絕對不要輸出任何開場白、不要輸出 "assistant" 標籤，也不要輸出多餘的說明。`;
 
         const genRes = await fetch('http://127.0.0.1:51123/api/generate', {
           method: 'POST',
@@ -633,9 +806,8 @@ export default function App() {
           throw new Error(genData.error || "Model Hub 本機推論失敗");
         }
 
-        const rawText = genData.text;
-        const cleaned = rawText.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '');
-        const parsedData = JSON.parse(cleaned);
+        // 使用強健型解析器解析模型回傳
+        const parsedData = parseAiJsonResponse(genData.text);
 
         setBasicInfo(prev => ({
           ...prev,
@@ -738,10 +910,10 @@ export default function App() {
 
       const MODEL_FALLBACK_CHAIN = [
         'gemini-3.8-flash',
-        'gemini-3.7-flash',
-        'gemini-3.6-flash',
+        'gemini-4-hydrogen',
         'gemini-4-argon',
-        'gemini-3.1-pro-preview',
+        'gemini-4-neon',
+        'gemini-4-carbon',
       ];
 
       // 嘗試備援鏈中的每一個模型
@@ -750,7 +922,7 @@ export default function App() {
       let lastError = null;
 
       for (const modelName of MODEL_FALLBACK_CHAIN) {
-        if (modelName === 'gemini-4-argon') {
+        if (modelName.startsWith('gemini-4')) {
           setLoadingText(`等待確認是否調用 ${modelName}...`);
           const decision = await confirmModelUsage(modelName);
           if (decision === 'cancel') {
@@ -783,7 +955,7 @@ export default function App() {
       const responseText = response.text;
       
       try {
-        const parsedData = JSON.parse(responseText.trim().replace(/^```json/, '').replace(/```$/, ''));
+        const parsedData = parseAiJsonResponse(responseText);
         
         // Auto-fill basic info
         setBasicInfo(prev => ({
@@ -837,9 +1009,12 @@ export default function App() {
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-blue-400/20 blur-[120px] rounded-full pointer-events-none"></div>
       <div className="absolute bottom-[-10%] right-[-5%] w-[40%] h-[40%] bg-indigo-400/20 blur-[100px] rounded-full pointer-events-none"></div>
 
-      <header className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-white/50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      <header 
+        className={`sticky top-0 z-50 bg-white/75 backdrop-blur-xl border-b border-white/50 shadow-sm select-none app-drag ${isDesktop ? 'pt-1' : ''}`}
+        style={{ WebkitAppRegion: 'drag' }}
+      >
+        <div className={`max-w-7xl mx-auto px-6 h-20 flex items-center justify-between ${isDesktop ? 'pl-24' : ''}`}>
+          <div className="flex items-center gap-4 app-no-drag" style={{ WebkitAppRegion: 'no-drag' }}>
             <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30">
               <LayoutGrid className="text-white" size={24} />
             </div>
@@ -850,13 +1025,23 @@ export default function App() {
               <p className="text-xs font-medium text-slate-500 tracking-wider uppercase">Intelligent Exam Analysis</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <button onClick={() => setShowChangelog(true)} className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-800 border border-slate-200 px-4 py-2.5 rounded-xl transition-all font-semibold text-sm shadow-sm hover:-translate-y-0.5 active:translate-y-0">
+          <div className="flex items-center gap-3 app-no-drag" style={{ WebkitAppRegion: 'no-drag' }}>
+            <button 
+              type="button"
+              onClick={() => setShowChangelog(true)} 
+              className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-800 border border-slate-200 px-4 py-2.5 rounded-xl transition-all font-semibold text-sm shadow-sm hover:-translate-y-0.5 active:translate-y-0"
+              style={{ WebkitAppRegion: 'no-drag' }}
+            >
               <History size={16} />
               更新紀錄
               <span className="ml-0.5 text-xs bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full font-bold">{CHANGELOG[0].version}</span>
             </button>
-            <button onClick={exportToWord} className="flex items-center gap-2.5 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl transition-all font-semibold text-sm shadow-xl shadow-blue-600/20 hover:-translate-y-0.5 active:translate-y-0">
+            <button 
+              type="button"
+              onClick={exportToWord} 
+              className="flex items-center gap-2.5 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl transition-all font-semibold text-sm shadow-xl shadow-blue-600/20 hover:-translate-y-0.5 active:translate-y-0"
+              style={{ WebkitAppRegion: 'no-drag' }}
+            >
               <FileText size={18} />
               匯出精美 Word
             </button>

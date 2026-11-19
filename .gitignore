@@ -12,7 +12,21 @@ node_modules
 dist-ssr
 *.local
 
-# Editor directories and files
+# Temporary test and build output
+release/
+extract*.cjs
+test-*.cjs
+extracted.txt
+copy_to_icloud.command
+gh-pages
+npm
+vite
+testanls@0.0.0
+run_test.js
+test.html
+test.mjs
+test_babel.js
+
 .vscode/*
 !.vscode/extensions.json
 .idea
