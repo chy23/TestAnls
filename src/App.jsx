@@ -922,7 +922,7 @@ ${syllabusText ? `【參考課本/教材內容】：\n${syllabusText.slice(0, 40
       let lastError = null;
 
       for (const modelName of MODEL_FALLBACK_CHAIN) {
-        if (modelName.startsWith('gemini-4')) {
+        if (modelName.startsWith('gemini-4') && modelName !== 'gemini-4-hydrogen') {
           setLoadingText(`等待確認是否調用 ${modelName}...`);
           const decision = await confirmModelUsage(modelName);
           if (decision === 'cancel') {
